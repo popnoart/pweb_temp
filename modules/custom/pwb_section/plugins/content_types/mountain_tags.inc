@@ -26,6 +26,7 @@ $plugin = array(
 function pwb_section_mountain_tags_content_type_render($subtype, $conf, $panel_args, $context) {
   $keys = '';
   $conf['paramount_tag'] = '';
+  $conf['paramount_url'] = request_path();
   $conf['mountain_tags'] = array();
   $selected_tags = array();
   $not_selected_tags = array();
@@ -38,9 +39,12 @@ function pwb_section_mountain_tags_content_type_render($subtype, $conf, $panel_a
   $block->content = '';
 
   $conf['paramount_tag'] = (isset($panel_args[0]) && !empty($panel_args[0])) ? $panel_args[0] : FALSE;
+//  $conf['paramount_url'] = drupal_get_path();
 
   if ($conf['paramount_tag'] !== FALSE) {
+//    kpr($conf);
     drupal_add_js(array('paramount_tag' => $conf['paramount_tag']), 'setting');
+    drupal_add_js(array('paramount_url' => $conf['paramount_url']), 'setting');
 
     list($results, $response) = pwb_section_do_search($conf, $keys);
     $returned_mountain_tags = $response->facet_counts->facet_fields->im_field_mountain_tags;

@@ -282,7 +282,8 @@ function pwb_section_url_inbound_alter(&$path, $original_path, $path_language) {
         unset($path_parts[1]);
         foreach ($path_parts as $next_term) {
           // TODO: Make it setting - the vocabulary
-          $term_objs = taxonomy_get_term_by_name($next_term, 'mountain_tags');
+          $mountain_tags_string = 'mountain_tags';
+          $term_objs = taxonomy_get_term_by_name($next_term, $mountain_tags_string);
           if (isset($term_objs) && !empty($term_objs)) {
             $mountain_tags[] = reset(array_keys($term_objs));
           }
