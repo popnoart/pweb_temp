@@ -441,6 +441,30 @@ function feature_frontpage_views_default_views() {
     'page' => 0,
     'block_1' => 0,
   );
+  $translatables['latest_news'] = array(
+    t('Master'),
+    t('latest_news'),
+    t('Se flere nyheder'),
+    t('Apply'),
+    t('Reset'),
+    t('Sort by'),
+    t('Asc'),
+    t('Desc'),
+    t('Items per page'),
+    t('- All -'),
+    t('Offset'),
+    t('<span class="text-footer">[created]</span><h2>[title]</h2>'),
+    t('node/[nid]'),
+    t('Page'),
+    t('more'),
+    t('<span class="text-date">[created]</span>'),
+    t('TEMA [field_tema]'),
+    t('[title]'),
+    t('Block'),
+    t('Block - Frontpage'),
+    t('Attachment'),
+    t('<span class="text-footer">[created]</span><h2 class="text-teaser">[title]</h2>[field_summary]'),
+  );
   $export['latest_news'] = $view;
 
   $view = new view;
@@ -864,6 +888,24 @@ function feature_frontpage_views_default_views() {
   $handler->display->display_options['allow']['title_override'] = 'title_override';
   $handler->display->display_options['allow']['exposed_form'] = 0;
   $handler->display->display_options['allow']['fields_override'] = 0;
+  $translatables['nodequeue_1'] = array(
+    t('Defaults'),
+    t('Queue \'frontpage\''),
+    t('more'),
+    t('Apply'),
+    t('Reset'),
+    t('Sort by'),
+    t('Asc'),
+    t('Desc'),
+    t('queue'),
+    t('Tema [field_tema] '),
+    t('Page'),
+    t('Block'),
+    t('Frontpage'),
+    t('View panes'),
+    t('Frontpage - Big'),
+    t('<div class="tile-text"><h2 class="title-tile-large">[title]</h2><p class="text-teaser">[field_summary]</p></div>'),
+  );
   $export['nodequeue_1'] = $view;
 
   $view = new view;
@@ -954,6 +996,24 @@ function feature_frontpage_views_default_views() {
   $handler->display->display_options['allow']['title_override'] = 'title_override';
   $handler->display->display_options['allow']['exposed_form'] = 'exposed_form';
   $handler->display->display_options['allow']['fields_override'] = 0;
+  $translatables['organization_terms'] = array(
+    t('Master'),
+    t('Organization terms'),
+    t('more'),
+    t('Apply'),
+    t('Reset'),
+    t('Sort by'),
+    t('Asc'),
+    t('Desc'),
+    t('Items per page'),
+    t('- All -'),
+    t('Offset'),
+    t('Parent'),
+    t('Term'),
+    t('Page'),
+    t('Content pane'),
+    t('View panes'),
+  );
   $export['organization_terms'] = $view;
 
   $view = new view;
@@ -1037,6 +1097,19 @@ function feature_frontpage_views_default_views() {
   $handler->display->display_options['allow']['title_override'] = 'title_override';
   $handler->display->display_options['allow']['exposed_form'] = 0;
   $handler->display->display_options['allow']['fields_override'] = 0;
+  $translatables['role_terms'] = array(
+    t('Master'),
+    t('Role terms'),
+    t('more'),
+    t('Apply'),
+    t('Reset'),
+    t('Sort by'),
+    t('Asc'),
+    t('Desc'),
+    t('Page'),
+    t('Content pane'),
+    t('View panes'),
+  );
   $export['role_terms'] = $view;
 
   $view = new view;
@@ -1164,6 +1237,22 @@ function feature_frontpage_views_default_views() {
   $handler->display->display_options['allow']['title_override'] = 'title_override';
   $handler->display->display_options['allow']['exposed_form'] = 0;
   $handler->display->display_options['allow']['fields_override'] = 0;
+  $translatables['terms_from_latest_articles'] = array(
+    t('Master'),
+    t('more'),
+    t('Apply'),
+    t('Reset'),
+    t('Sort by'),
+    t('Asc'),
+    t('Desc'),
+    t('node'),
+    t(' '),
+    t('.'),
+    t(','),
+    t('Page'),
+    t('Content pane'),
+    t('View panes'),
+  );
   $export['terms_from_latest_articles'] = $view;
 
   $view = new view;
@@ -1894,6 +1983,31 @@ function feature_frontpage_views_default_views() {
     'default' => 0,
     'page' => 0,
     'block_1' => 0,
+  );
+  $translatables['upcoming_events'] = array(
+    t('Master'),
+    t('upcoming_events'),
+    t('Se flere arrangementer'),
+    t('Apply'),
+    t('Reset'),
+    t('Sort by'),
+    t('Asc'),
+    t('Desc'),
+    t('Items per page'),
+    t('- All -'),
+    t('Offset'),
+    t('[field_location], '),
+    t('Date'),
+    t('Sted: [field_location][field_date] - [field_date_1]'),
+    t('<h2>[title]</h2><p class="text-footer">[field_date]</p>'),
+    t('Page'),
+    t('more'),
+    t('<h2>[title]</h2>'),
+    t('Block'),
+    t('Block - Frontpage'),
+    t('Attachment'),
+    t('Summary'),
+    t('<h2 class="text-teaser">[title]</h2>[field_summary]<p class="text-footer">[field_date]</p>'),
   );
   $export['upcoming_events'] = $view;
 

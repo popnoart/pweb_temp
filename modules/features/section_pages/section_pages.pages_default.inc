@@ -28,6 +28,21 @@ function section_pages_default_page_manager_handlers() {
     'css' => '',
     'contexts' => array(),
     'relationships' => array(),
+    'access' => array(
+      'plugins' => array(
+        0 => array(
+          'name' => 'term_vocabulary',
+          'settings' => array(
+            'vids' => array(
+              6 => '6',
+            ),
+          ),
+          'context' => 'argument_term_1',
+          'not' => FALSE,
+        ),
+      ),
+      'logic' => 'and',
+    ),
   );
   $display = new panels_display();
   $display->layout = '2_2_stacked';
@@ -301,7 +316,7 @@ function section_pages_default_page_manager_handlers() {
         'tema' => 0,
         'panel' => 0,
       ),
-      'override_empty' => 0,
+      'override_empty' => 1,
       'empty_title' => '',
       'empty' => NULL,
       'empty_format' => NULL,
@@ -315,7 +330,7 @@ function section_pages_default_page_manager_handlers() {
       'no_key_word_search' => 1,
       'enable_see_more' => 1,
       'see_more_link_text' => 'See more News',
-      'see_more_link_points_to' => '/search/personaleweb',
+      'see_more_link_points_to' => '/latest-news',
       'apachesolr_search_sort' => 1,
       'type_of_search' => 'section_news_search_results',
       'key_word_search' => 1,
@@ -362,8 +377,8 @@ function section_pages_default_page_manager_handlers() {
       'apachesolr_search_sort' => 1,
       'enable_see_more' => 1,
       'see_more_link_text' => 'See all events',
-      'see_more_link_points_to' => 'search/personaleweb',
-      'override_empty' => 0,
+      'see_more_link_points_to' => '/upcoming-events',
+      'override_empty' => 1,
       'empty_title' => '',
       'empty' => NULL,
       'empty_format' => NULL,
@@ -415,6 +430,236 @@ function section_pages_default_page_manager_handlers() {
   $display->title_pane = '0';
   $handler->conf['display'] = $display;
   $export['term_view_panel_context'] = $handler;
+
+  $handler = new stdClass();
+  $handler->disabled = FALSE; /* Edit this to true to make a default handler disabled initially */
+  $handler->api_version = 1;
+  $handler->name = 'term_view_panel_context_2';
+  $handler->task = 'term_view';
+  $handler->subtask = '';
+  $handler->handler = 'panel_context';
+  $handler->weight = 1;
+  $handler->conf = array(
+    'title' => 'Taxonomy Term View Page Without Section',
+    'no_blocks' => 0,
+    'pipeline' => 'standard',
+    'body_classes_to_remove' => '',
+    'body_classes_to_add' => '',
+    'css_id' => '',
+    'css' => '',
+    'contexts' => array(),
+    'relationships' => array(),
+    'access' => array(
+      'plugins' => array(
+        0 => array(
+          'name' => 'term_vocabulary',
+          'settings' => array(
+            'vids' => array(
+              2 => '2',
+              3 => '3',
+              4 => '4',
+              5 => '5',
+              8 => '8',
+              9 => '9',
+              7 => '7',
+              1 => '1',
+            ),
+          ),
+          'context' => 'argument_term_1',
+          'not' => FALSE,
+        ),
+      ),
+      'logic' => 'and',
+    ),
+  );
+  $display = new panels_display();
+  $display->layout = '2_2_stacked';
+  $display->layout_settings = array();
+  $display->panel_settings = array(
+    'style_settings' => array(
+      'default' => NULL,
+      'filters' => NULL,
+      'top' => NULL,
+      'left' => NULL,
+      'right' => NULL,
+      'bottom' => NULL,
+    ),
+  );
+  $display->cache = array();
+  $display->title = '';
+  $display->content = array();
+  $display->panels = array();
+    $pane = new stdClass();
+    $pane->pid = 'new-11';
+    $pane->panel = 'left';
+    $pane->type = 'search_results';
+    $pane->subtype = 'search_results';
+    $pane->shown = TRUE;
+    $pane->access = array();
+    $pane->configuration = array(
+      'templates' => 'simple_search_results',
+      'type_of_search' => 'section_tag_listing_search_results',
+      'image_style' => 'pweb_search',
+      'pwb_date_formats' => 'search_personaleweb',
+      'rows_per_page' => '5',
+      'key_word_search' => 1,
+      'key_word_search_paramount' => 0,
+      'key_word_search_mountain' => 1,
+      'key_word_search_global' => 0,
+      'results_title' => '',
+      'content_types' => array(
+        'events' => 0,
+        'article' => 0,
+        'news' => 0,
+        'page' => 0,
+        'project' => 0,
+        'report' => 0,
+        'teaser' => 0,
+        'webform' => 0,
+        'tema' => 0,
+        'panel' => 0,
+      ),
+      'apachesolr_search_sort' => 0,
+      'enable_see_more' => 0,
+      'see_more_link_text' => '',
+      'see_more_link_points_to' => '',
+      'override_empty' => 0,
+      'empty_title' => '',
+      'empty' => NULL,
+      'empty_format' => NULL,
+      'override_no_key' => 0,
+      'no_key_title' => '',
+      'no_key' => NULL,
+      'no_key_format' => NULL,
+      'override_title' => 1,
+      'override_title_text' => '',
+    );
+    $pane->cache = array();
+    $pane->style = array(
+      'settings' => NULL,
+    );
+    $pane->css = array();
+    $pane->extras = array();
+    $pane->position = 0;
+    $pane->locks = array();
+    $display->content['new-11'] = $pane;
+    $display->panels['left'][0] = 'new-11';
+    $pane = new stdClass();
+    $pane->pid = 'new-12';
+    $pane->panel = 'right';
+    $pane->type = 'search_results';
+    $pane->subtype = 'search_results';
+    $pane->shown = TRUE;
+    $pane->access = array();
+    $pane->configuration = array(
+      'templates' => 'simple_search_results',
+      'rows_per_page' => '5',
+      'results_title' => 'News',
+      'content_types' => array(
+        'news' => 'news',
+        'events' => 0,
+        'article' => 0,
+        'page' => 0,
+        'project' => 0,
+        'report' => 0,
+        'teaser' => 0,
+        'webform' => 0,
+        'tema' => 0,
+        'panel' => 0,
+      ),
+      'override_empty' => 1,
+      'empty_title' => '',
+      'empty' => NULL,
+      'empty_format' => NULL,
+      'override_no_key' => 0,
+      'no_key_title' => '',
+      'no_key' => NULL,
+      'no_key_format' => NULL,
+      'override_title' => 1,
+      'override_title_text' => '',
+      'image_style' => 'thumbnail',
+      'no_key_word_search' => 1,
+      'enable_see_more' => 1,
+      'see_more_link_text' => 'See more News',
+      'see_more_link_points_to' => '/latest-news',
+      'apachesolr_search_sort' => 1,
+      'type_of_search' => 'section_news_search_results',
+      'key_word_search' => 1,
+      'key_word_search_paramount' => 0,
+      'key_word_search_mountain' => 1,
+      'key_word_search_global' => 0,
+      'pwb_date_formats' => 'news_date',
+    );
+    $pane->cache = array();
+    $pane->style = array(
+      'settings' => NULL,
+    );
+    $pane->css = array();
+    $pane->extras = array();
+    $pane->position = 0;
+    $pane->locks = array();
+    $display->content['new-12'] = $pane;
+    $display->panels['right'][0] = 'new-12';
+    $pane = new stdClass();
+    $pane->pid = 'new-13';
+    $pane->panel = 'right';
+    $pane->type = 'search_results';
+    $pane->subtype = 'search_results';
+    $pane->shown = TRUE;
+    $pane->access = array();
+    $pane->configuration = array(
+      'templates' => 'simple_search_results',
+      'image_style' => 'thumbnail',
+      'rows_per_page' => '5',
+      'no_key_word_search' => 1,
+      'results_title' => 'Upcoming events',
+      'content_types' => array(
+        'events' => 'events',
+        'article' => 0,
+        'news' => 0,
+        'page' => 0,
+        'project' => 0,
+        'report' => 0,
+        'teaser' => 0,
+        'webform' => 0,
+        'tema' => 0,
+        'panel' => 0,
+      ),
+      'apachesolr_search_sort' => 1,
+      'enable_see_more' => 1,
+      'see_more_link_text' => 'See more events',
+      'see_more_link_points_to' => '/upcoming-events',
+      'override_empty' => 1,
+      'empty_title' => '',
+      'empty' => NULL,
+      'empty_format' => NULL,
+      'override_no_key' => 0,
+      'no_key_title' => '',
+      'no_key' => NULL,
+      'no_key_format' => NULL,
+      'override_title' => 1,
+      'override_title_text' => '',
+      'type_of_search' => 'section_events_search_results',
+      'key_word_search' => 0,
+      'key_word_search_paramount' => 0,
+      'key_word_search_mountain' => 0,
+      'key_word_search_global' => 0,
+      'pwb_date_formats' => 'event_date',
+    );
+    $pane->cache = array();
+    $pane->style = array(
+      'settings' => NULL,
+    );
+    $pane->css = array();
+    $pane->extras = array();
+    $pane->position = 1;
+    $pane->locks = array();
+    $display->content['new-13'] = $pane;
+    $display->panels['right'][1] = 'new-13';
+  $display->hide_title = PANELS_TITLE_FIXED;
+  $display->title_pane = '0';
+  $handler->conf['display'] = $display;
+  $export['term_view_panel_context_2'] = $handler;
 
   return $export;
 }
@@ -505,7 +750,7 @@ function section_pages_default_page_manager_pages() {
   $display->content = array();
   $display->panels = array();
     $pane = new stdClass();
-    $pane->pid = 'new-11';
+    $pane->pid = 'new-14';
     $pane->panel = 'filters';
     $pane->type = 'mountain_tags';
     $pane->subtype = 'mountain_tags';
@@ -532,10 +777,10 @@ function section_pages_default_page_manager_pages() {
     $pane->extras = array();
     $pane->position = 0;
     $pane->locks = array();
-    $display->content['new-11'] = $pane;
-    $display->panels['filters'][0] = 'new-11';
+    $display->content['new-14'] = $pane;
+    $display->panels['filters'][0] = 'new-14';
     $pane = new stdClass();
-    $pane->pid = 'new-12';
+    $pane->pid = 'new-15';
     $pane->panel = 'left';
     $pane->type = 'search_results';
     $pane->subtype = 'search_results';
@@ -588,10 +833,10 @@ function section_pages_default_page_manager_pages() {
     $pane->extras = array();
     $pane->position = 0;
     $pane->locks = array();
-    $display->content['new-12'] = $pane;
-    $display->panels['left'][0] = 'new-12';
+    $display->content['new-15'] = $pane;
+    $display->panels['left'][0] = 'new-15';
     $pane = new stdClass();
-    $pane->pid = 'new-13';
+    $pane->pid = 'new-16';
     $pane->panel = 'right';
     $pane->type = 'search_results';
     $pane->subtype = 'search_results';
@@ -614,7 +859,7 @@ function section_pages_default_page_manager_pages() {
         'tema' => 0,
         'panel' => 0,
       ),
-      'override_empty' => 0,
+      'override_empty' => 1,
       'empty_title' => '',
       'empty' => NULL,
       'empty_format' => NULL,
@@ -644,10 +889,10 @@ function section_pages_default_page_manager_pages() {
     $pane->extras = array();
     $pane->position = 0;
     $pane->locks = array();
-    $display->content['new-13'] = $pane;
-    $display->panels['right'][0] = 'new-13';
+    $display->content['new-16'] = $pane;
+    $display->panels['right'][0] = 'new-16';
     $pane = new stdClass();
-    $pane->pid = 'new-14';
+    $pane->pid = 'new-17';
     $pane->panel = 'right';
     $pane->type = 'search_results';
     $pane->subtype = 'search_results';
@@ -699,10 +944,10 @@ function section_pages_default_page_manager_pages() {
     $pane->extras = array();
     $pane->position = 1;
     $pane->locks = array();
-    $display->content['new-14'] = $pane;
-    $display->panels['right'][1] = 'new-14';
+    $display->content['new-17'] = $pane;
+    $display->panels['right'][1] = 'new-17';
   $display->hide_title = PANELS_TITLE_FIXED;
-  $display->title_pane = 'new-12';
+  $display->title_pane = 'new-15';
   $handler->conf['display'] = $display;
   $page->default_handlers[$handler->name] = $handler;
   $pages['section_and_mointain_tags'] = $page;
