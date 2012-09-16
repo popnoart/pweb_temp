@@ -1,0 +1,12 @@
+name = Theme Settings
+description = Theme specific settings for Personaleweb
+core = 7.x
+package = PWB
+php = 5.2.4
+version = 7.x-1.0-dev
+project = pwb_theme_settings
+dependencies[] = ctools
+dependencies[] = strongarm
+features[ctools][] = strongarm:strongarm:1
+features[features_api][] = api:1
+features[variable][] = theme_personaleweb_settings

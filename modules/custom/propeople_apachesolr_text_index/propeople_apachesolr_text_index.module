@@ -1,0 +1,56 @@
+<?php
+
+/**
+ * Created on March 21, 2012
+ *
+ * @file
+ *
+ * propeople_apachesolr_text_index.module
+ * @author Lachezar Valchev
+ * <lachezar@propeople.dk>
+ *
+ * @version 1.0
+ */
+
+/**
+ * Implements hook_help().
+ */
+function propeople_apachesolr_text_index_help($path, $arg) {
+  $output = '';
+  switch ($path) {
+    case "admin/help#propeople_apachesolr_text_index":
+      $output = 'The module will add a new possibility to the standard apachesolr module - to index text fields as "text" as well as "string".';
+      break;
+  }
+
+  return $output;
+}
+
+/**
+ * Implements hook_apachesolr_field_mappings().
+ */
+function propeople_apachesolr_text_index_apachesolr_field_mappings() {
+  return array(
+    'text' => array(
+      'indexing_callback' => 'apachesolr_fields_default_indexing_callback',
+      'map callback' => 'apachesolr_fields_list_facet_map_callback',
+      'index_type' => 'text',
+      'facets' => TRUE,
+      'facet missing allowed' => TRUE,
+    ),
+    'text_long' => array(
+      'indexing_callback' => 'apachesolr_fields_default_indexing_callback',
+      'map callback' => 'apachesolr_fields_list_facet_map_callback',
+      'index_type' => 'text',
+      'facets' => TRUE,
+      'facet missing allowed' => TRUE,
+    ),
+    'text_with_summary' => array(
+      'indexing_callback' => 'apachesolr_fields_default_indexing_callback',
+      'map callback' => 'apachesolr_fields_list_facet_map_callback',
+      'index_type' => 'text',
+      'facets' => TRUE,
+      'facet missing allowed' => TRUE,
+    ),
+  );
+}

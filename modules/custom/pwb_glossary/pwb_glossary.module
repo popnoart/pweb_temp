@@ -1,0 +1,132 @@
+<?php
+
+
+/**
+ * Module pwb_glossary
+ * @file
+ * pwb_glossary.module
+ */
+
+/**
+ * Implements hook_filter_info().
+ */
+function pwb_glossary_filter_info() {
+  $filters = array();
+
+  $filters['glossary'] = array(
+    'title' => t('Taxonomy Glossary'),
+    'description' => t('Add description "popup" to terms or synonyms of the terms from given taxonomy when the node is viewed'),
+    'prepare callback' => '_pwb_glossary_prepare',
+    'process callback' => '_pwb_glossary_process',
+    'tips callback'    => '_pwb_glossary_tips',
+  );
+
+  return $filters;
+}
+
+/**
+ * Implements hook_taxonomy_term_update().
+ */
+function pwb_glossary_taxonomy_term_update($term) {
+  if ($term->vocabulary_machine_name == 'glossary') {
+    // Clear our Term synonyms replace cache
+    cache_clear_all('pdb_glossary_terms', 'cache_pwb_glossary', FALSE);
+
+    // Clear all nodes cache so they can rebuild the Glossary filter
+    cache_clear_all('field:node:', 'cache_field', TRUE);
+  }
+}
+
+/**
+ * Implements hook_taxonomy_term_inser().
+ */
+function pwb_glossary_taxonomy_term_insert($term) {
+  if ($term->vocabulary_machine_name == 'glossary') {
+    // Clear our Term synonyms replace cache
+    cache_clear_all('pdb_glossary_terms', 'cache_pwb_glossary', FALSE);
+
+    // Clear all nodes cache so they can rebuild the Glossary filter
+    cache_clear_all('field:node:', 'cache_field', TRUE);
+  }
+}
+
+/**
+ * Filter Prepare callback
+ */
+function _pwb_glossary_prepare( $text, $filter) {
+  return $text;
+}
+
+/**
+ * Filter Process callback
+ */
+function _pwb_glossary_process( $text, $filter) {
+  $tags = _pwb_glossary_get();
+
+  $text =preg_replace($tags['patterns'], $tags['replacements'], $text, 1);
+  return $text;
+}
+
+/**
+ * Filter Tips Callback
+ */
+function _pwb_glossary_tips($filter, $format, $long = FALSE) {
+  return t('Add to "tags" or there synonyms ocurences with hover link with term description');
+}
+
+
+/**
+ * Function to handle retrieving of Taxonomy terms
+ * there synonyms are building patterns and replacements arrays
+ *
+ */
+function _pwb_glossary_get() {
+  // We check do we have the needed data cached so we don't need to generate it again
+  if ($synonyms = cache_get('pdb_glossary_terms', 'cache_pwb_glossary')) {
+    return $synonyms->data;
+  }
+
+  // We don't have cache so we build the needed data
+  $name = 'glossary';
+  $synonyms = array();
+
+  // Get the taxonomy by machine_name and get its terms
+  $taxonomy = taxonomy_vocabulary_machine_name_load($name);
+  $terms = taxonomy_get_tree($taxonomy->vid, 0, 1, TRUE);
+
+  foreach ($terms as $term) {
+
+    // Build patterns for preg_replace
+    $word_start = '(?<![\<\-\=\"])';
+    $word_end = '(?![\>\-\=\"])';
+
+    $pattern = '/' . $word_start . '(\b' . trim($term->name) . '\b';
+
+    // Get the synonyms of the given term
+    $tmp= field_get_items('taxonomy_term', $term, 'field_term_synonyms');
+    if (!empty($tmp)) {
+      // If there are synonyms given check for them too
+      $syn_arr = explode(';', $tmp[0]['value']);
+
+      foreach ($syn_arr as $string) {
+        $string = trim($string);
+        if($string) {
+          $pattern .=  '|\b' . trim($string) . '\b';
+        }
+      }
+    }
+    $pattern .= ')' . $word_end . '/i';
+
+
+    $synonyms['patterns'][] = $pattern;
+    // Build the replacement HTML for preg_replace
+    $synonyms['replacements'][] = '<span class="glossary-term">$1<span class="glossary-term-description">' . $term->description . '</span></span>';
+
+  }
+
+  // Set the builded data to cache. We use custom table so only we have control on this cache
+  // We clear it on term_update/term_insert
+  cache_set('pdb_glossary_terms', $synonyms, 'cache_pwb_glossary', CACHE_PERMANENT);
+
+  return $synonyms;
+}

@@ -1,0 +1,65 @@
+<?php
+
+
+/**
+ * Module pwb_subscribe
+ * @file pwb_subscribe.install
+ */
+
+function pwb_subscribe_schema() {
+  $schema['pwb_subscribe'] = array(
+    'description' => 'The base table for subscriptions',
+    'fields' => array(
+      'id'  => array(
+        'description' => 'Just an unique id for a PK value',
+        'type'  => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'email' => array(
+        'description' => 'Holding the subscriber email - we match the subscriptions by this field',
+        'type'  => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'default'  => '',
+      ),
+      'subscription_uri' => array(
+        'description' => 'The Uri to witch the user is subscribed',
+        'type'  =>  'varchar',
+        'length'  => 256,
+        'not null'  => TRUE,
+        'default'   => '',
+      ),
+      'search_params' => array(
+        'description' => 'Holds JSON of array that holds solr settings needed to fire the proper query',
+        'type'      => 'text',
+      ),
+      'subscription_type' => array(
+        'description' => 'Type of the subscription; At the moment SECTION and SEARCH',
+        'type'      => 'int',
+        'size'      => 'tiny',
+        'not null'  => TRUE,
+        'default'   => 0,
+      ),
+      'token' => array(
+        'description' => 'Hold Unique hash of email+id',
+        'type'        => 'varchar',
+        'length'      => 50,
+        'not null'    => TRUE,
+        'default'     => '',
+      ),
+      'created' => array(
+        'description' => 'The Unix timestamp when the subscription was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0
+      ),
+    ),
+    'indexes' => array(
+      'subscriber_email'  => array('email')
+    ),
+    'primary key' => array('id'),
+  );
+
+  return $schema;
+}

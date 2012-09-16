@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the feature_cnr feature.
+ */
+
+include_once 'feature_cnr.features.inc';

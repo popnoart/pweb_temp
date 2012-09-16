@@ -1,0 +1,4 @@
+name = Pwb general
+description = "Module description"
+core = 7.x
+package = ProPeople

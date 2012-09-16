@@ -1,0 +1,13 @@
+name = Search Results Page
+description = The feature will export the search results page
+core = 7.x
+package = PWB
+php = 5.2.4
+version = 7.x-1.0
+project = search_results_page
+dependencies[] = apachesolr_and_facets
+dependencies[] = ctools
+dependencies[] = page_manager
+features[ctools][] = page_manager:pages_default:1
+features[features_api][] = api:1
+features[page_manager_pages][] = search_personaleweb

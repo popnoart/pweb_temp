@@ -1,0 +1,7 @@
+name = ProPeople Apachesolr Text Index
+description = ProPeople apachesolr text index module provides possibility to index text fields as "text" as well as "string".
+core = 7.x
+package = Propeople
+dependencies[] = apachesolr_search
+
+files[] = propeople_apachesolr_text_index.module

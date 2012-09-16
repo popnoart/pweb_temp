@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the Personaleweb Imagesettings feature.
+ */
+
+include_once 'pwb_imagesettings.features.inc';

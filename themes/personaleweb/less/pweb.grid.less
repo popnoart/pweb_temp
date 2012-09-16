@@ -1,0 +1,153 @@
+// Import variables and mixins
+@import "pweb.variables.less";
+
+// Base 5 column grid
+// -------------------------
+.grid(@cols) {
+  width: (@cols * @grid-base) + ((@cols - 1) * @grid-space) + @cols;
+  margin-right: @grid-space;
+  float: left;
+}
+
+.grid-full {
+  //margin-right: @grid-space;
+}
+
+.grid-1 {
+  .grid(1);
+}
+
+.grid-2 {
+  .grid(2);
+}
+
+.grid-3 {
+  .grid(3);
+}
+
+.grid-4 {
+  .grid(4);
+}
+
+.grid .grid:last-child {
+  margin-right: 0;
+}
+
+.grid-15 {
+  margin-right: @grid-space;
+  float: left;
+}
+
+
+// Vertical grid for tiles
+// -------------------------
+.vgrid-1,
+.hgrid-1 {
+  height: @hgrid-base;
+  margin-bottom: @hgrid-space;
+}
+
+.vgrid-2,
+.hgrid-2 {
+  height: (2 * @hgrid-base) + @hgrid-space;
+  margin-bottom: @hgrid-space;
+}
+
+
+// Media queries
+// ------------------------
+
+.wrapper {
+  .transition(width 0.7s ease-in-out 0.1s);
+  padding-bottom: 6px;
+  clear: both;
+  position: relative;
+}
+
+// 4 column layout.
+// Desktops and laptops
+@media only screen
+and (min-width : 993px) {
+  .wrapper {
+    width: 4 * (@grid-base + @grid-space) + 4;
+    margin: 0 auto;
+  }
+
+  .masonry-front {
+    .grid(2);
+  }
+
+  .cell-2-1 {
+    .grid(2);
+  }
+
+  // 2/3 column grid
+  .grid-15 {
+    width: @grid-base * 1.5 + @grid-space/2;
+    padding-right: 56px;
+  }
+}
+
+// 3 column layout.
+// Horisontal tablets and smaller laptops.
+@media only screen
+and (min-width : 736px)
+and (max-width : 993px) {
+  .wrapper {
+    width: 3 * (@grid-base + @grid-space) + 3;
+    margin: 0 auto;
+  }
+  .cell-2-1 {
+    .grid(1);
+
+    .ui-tabs {
+      .vgrid-2;
+    }
+  }
+
+  // 2/3 column grid
+  .grid-15 {
+    .grid(1);
+  }
+}
+
+// 2 column layout.
+// Vertical tablets
+@media only screen
+and (min-width : 492px)
+and (max-width : 736px) {
+  .wrapper {
+    width: 2 * (@grid-base + @grid-space) + 2;
+    margin: 0 auto;
+  }
+
+  .masonry-front,
+  .grid-3,
+  .grid-4 {
+    .grid(2);
+  }
+
+  // 2/3 column grid
+  .grid-15 {
+    .grid(1);
+  }
+}
+
+// 1 column layout.
+// Mobile.
+@media only screen
+and (max-width : 492px) {
+  .wrapper {
+    width: @grid-base + @grid-space + 1;
+    margin: 0 auto;
+  }
+
+  .grid-2, .grid-3, .grid-4 .grid-15, .cell-2-1 {
+    .grid(1);
+  }
+
+  .tile.vgrid-2 {
+    .vgrid-1;
+  }
+}
+

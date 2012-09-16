@@ -1,0 +1,123 @@
+.grid-1 {
+  width: 235px;
+  margin-right: 8px;
+  float: left;
+}
+.grid-2 {
+  width: 478px;
+  margin-right: 8px;
+  float: left;
+}
+.grid-3 {
+  width: 721px;
+  margin-right: 8px;
+  float: left;
+}
+.grid-4 {
+  width: 964px;
+  margin-right: 8px;
+  float: left;
+}
+.grid .grid:last-child {
+  margin-right: 0;
+}
+.grid-15 {
+  margin-right: 8px;
+  float: left;
+}
+.vgrid-1,
+.hgrid-1 {
+  height: 175px;
+  margin-bottom: 8px;
+}
+.vgrid-2,
+.hgrid-2 {
+  height: 358px;
+  margin-bottom: 8px;
+}
+.wrapper {
+  -moz-transition: width 0.7s ease-in-out 0.1s;
+  -o-transition: width 0.7s ease-in-out 0.1s;
+  -ms-transition: width 0.7s ease-in-out 0.1s;
+  -webkit-transition: width 0.7s ease-in-out 0.1s;
+  transition: width 0.7s ease-in-out 0.1s;
+  padding-bottom: 6px;
+  clear: both;
+  position: relative;
+}
+@media only screen and (min-width: 993px) {
+  .wrapper {
+    width: 972px;
+    margin: 0 auto;
+  }
+  .masonry-front {
+    width: 478px;
+    margin-right: 8px;
+    float: left;
+  }
+  .cell-2-1 {
+    width: 478px;
+    margin-right: 8px;
+    float: left;
+  }
+  .grid-15 {
+    width: 355px;
+    padding-right: 56px;
+  }
+}
+@media only screen and (min-width: 736px) and (max-width: 993px) {
+  .wrapper {
+    width: 729px;
+    margin: 0 auto;
+  }
+  .cell-2-1 {
+    width: 235px;
+    margin-right: 8px;
+    float: left;
+  }
+  .cell-2-1 .ui-tabs {
+    height: 358px;
+    margin-bottom: 8px;
+  }
+  .grid-15 {
+    width: 235px;
+    margin-right: 8px;
+    float: left;
+  }
+}
+@media only screen and (min-width: 492px) and (max-width: 736px) {
+  .wrapper {
+    width: 486px;
+    margin: 0 auto;
+  }
+  .masonry-front,
+  .grid-3,
+  .grid-4 {
+    width: 478px;
+    margin-right: 8px;
+    float: left;
+  }
+  .grid-15 {
+    width: 235px;
+    margin-right: 8px;
+    float: left;
+  }
+}
+@media only screen and (max-width: 492px) {
+  .wrapper {
+    width: 243px;
+    margin: 0 auto;
+  }
+  .grid-2,
+  .grid-3,
+  .grid-4 .grid-15,
+  .cell-2-1 {
+    width: 235px;
+    margin-right: 8px;
+    float: left;
+  }
+  .tile.vgrid-2 {
+    height: 175px;
+    margin-bottom: 8px;
+  }
+}

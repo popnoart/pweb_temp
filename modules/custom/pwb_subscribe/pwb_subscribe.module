@@ -1,0 +1,579 @@
+<?php
+
+
+/**
+ * Module pwb_subscribe
+ * @file pwb_subscribe.module
+ */
+
+
+define("PWB_SUBSCRIBE_TYPE_UNKNOWN", 0);
+define("PWB_SUBSCRIBE_TYPE_SECTION", 1);
+define("PWB_SUBSCRIBE_TYPE_SEARCH", 2);
+
+
+function pwb_subscribe_boot() {
+  module_load_include("inc", "pwb_subscribe", "pwb_subscribe.email");
+}
+
+/**
+ * Implements hook_menu()
+ */
+function pwb_subscribe_menu() {
+  $items = array(
+    'subscriptions/list' => array(
+      'page callback'   => 'pwb_subscribe_list',
+      'page arguments'  => array(2),
+      'access callback' => TRUE,
+      'file' => 'pwb_subscribe.email.inc'
+    ),
+    'subscriptions/%/rss.xml' => array(
+      'page callback' => 'pwb_subscribe_rss',
+      'page arguments' => array(1),
+      'access callback' => TRUE,
+      'file' => 'pwb_subscribe.rss.inc',
+    ),
+  );
+
+  return $items;
+}
+
+
+/**
+ * Implements hook_block_info().
+ */
+function pwb_subscribe_block_info() {
+  $blocks = array(
+    'pwb_subscribe' => array(
+      'info'  => t('PWB Subscribe'),
+    ),
+  );
+
+  return $blocks;
+}
+
+
+function pwb_subscribe_theme() {
+  return array(
+    'pwb_subscribe_search_result' => array(
+        'variables' => array(
+            'result' => NULL,
+            'module' => NULL,
+            'image_style' => NULL,
+            'result_number' => NULL,
+            'pwb_date_formats' => NULL,
+          ),
+        'template' => 'pwb-subscribe-search-result',
+        'path' => drupal_get_path('module', 'pwb_subscribe') . '/templates',
+      ),
+  );
+}
+
+
+/**
+ * Process variables for pwb-subscribe-search-result.tpl.php.
+ *
+ * The $variables array contains the following arguments:
+ * - $result
+ * - $module
+ *
+ * @see pwb-subscribe-search-result.tpl.php
+ */
+function template_preprocess_pwb_subscribe_search_result(&$variables) {
+  $result = $variables['result'];
+  $result_fields = $result['fields'];
+  $variables['item_class'] = 'list-item';
+  $variables['info'] = array();
+  $variables['bottom_info'] = '';
+
+  if (isset($result_fields['entity_type']) && $result_fields['entity_type'] == 'node') {
+    // Load the specific entity
+    $variables['result_title'] = l($result_fields['label'], $result_fields['path']);
+    $variables['result_snippet'] = $result['snippet'];
+
+    if (isset($result_fields['is_field_image'])) {
+      $image_file = file_load($result_fields['is_field_image']);
+      if ($image_file) {
+        $variables['result_image'] = theme('image_style', array('style_name' => $variables['image_style'], 'path' => $image_file->uri));
+      }
+
+      $variables['item_class'] = 'list-item media-item-right';
+    }
+
+    if (isset($result_fields['im_field_section']) && !empty($result_fields['im_field_section'])) {
+      $variables['info']['result_paramount_tag'] = l(t(reset($result_fields['sm_vid_Paramount_tags'])), 'taxonomy/term/' . reset($result_fields['im_field_section']));
+    }
+
+    if (isset($result_fields['im_field_tema']) && !empty($result_fields['im_field_tema'])) {
+      $node_obj = node_load(reset($result_fields['im_field_tema']));
+      if ($node_obj) {
+        $variables['info']['result_tema'] = 'Tema: ' . l($node_obj->title, 'node/' . $node_obj->nid);
+      }
+    }
+
+    $variables['info']['result_content_type'] = $result_fields['bundle_name'];
+    $variables['info']['result_date'] = format_date(strtotime($result_fields['ds_created']), $variables['pwb_date_formats']);
+    $variables['bottom_info'] = implode(' - ', $variables['info']);
+  }
+
+  $variables['theme_hook_suggestions'][] = 'pwb_subscribe_search_result__' . $variables['module'];
+
+}
+
+
+/**
+ * Implements hook_block_view()
+ */
+function pwb_subscribe_block_view($delta = '') {
+  if ($delta == 'pwb_subscribe') {
+    return array(
+      'subject' => NULL,
+      'content' => drupal_get_form('pwb_subscribe_block'),
+    );
+  }
+}
+
+
+/**
+ * Implements form for the subscribe block
+ */
+function pwb_subscribe_block() {
+  global $user;
+
+  $form['email'] = array(
+    '#type'   => 'textfield',
+    '#title'  => t('E-mail'),
+    '#default_value' => isset($user->mail) ? $user->mail : '',
+    '#size'   => 32,
+    '#maxlength' => 128,
+    '#required'  => TRUE,
+  );
+
+  $destination = drupal_get_destination();
+  $form['subscription_uri'] = array(
+    '#type'   => 'hidden',
+    '#title'  => t('Subscribed Uri'),
+    '#value'  => $destination['destination'],
+  );
+
+  $form['unsubscribe'] = array(
+    '#type'   => 'submit',
+    '#value'  => t('Unsubscribe'),
+    '#submit' => array('pwb_subscribe_block_form_unsubscribe'),
+  );
+
+  $form['submit'] = array(
+    '#type'   => 'submit',
+    '#value'  => t('Subscribe'),
+    '#submit' => array('pwb_subscribe_block_form_submit'),
+  );
+
+  $uri = $destination['destination'];
+  list($subscription_type, $search) = pwb_subscribe_build_search_params( $uri);
+  if($subscription_type == PWB_SUBSCRIBE_TYPE_SECTION) {
+    $rss_link = l('RSS', 'subscriptions/' . current($search['filters']) . '/rss.xml');
+
+    $form['rss'] = array(
+      '#type'   => 'markup',
+      '#markup' => $rss_link,
+    );
+  }
+
+  return $form;
+}
+
+
+/**
+ * Implement hook_form_submit()
+ */
+function pwb_subscribe_block_form_submit($form, &$form_state) {
+  module_load_include('inc', 'pwb_subscribe', 'pwb_subscribe.email');
+
+  $uri = $form_state['values']['subscription_uri'];
+  $path_info = drupal_parse_url( $uri);
+
+  list($subscription_type, $search) = pwb_subscribe_build_search_params( $uri);
+
+  pwb_subscribe_save_subscription($subscription_type, $form_state['values'], $search);
+
+  drupal_goto($path_info['path'], $path_info);
+}
+
+
+/**
+ * Unsubscribe from given page
+ */
+function pwb_subscribe_block_form_unsubscribe($form, &$form_state) {
+  module_load_include('inc', 'pwb_subscribe', 'pwb_subscribe.email');
+
+  $uri = $form_state['values']['subscription_uri'];
+  $path_info = drupal_parse_url( $uri);
+
+  list($subscription_type, $search) = pwb_subscribe_build_search_params( $uri);
+
+  $res = pwb_subscribe_remove_subscription_by_email($form_state['values']);
+  if($res) {
+    drupal_set_message(t('You have successfully unsubscribe'));
+  } else {
+    drupal_set_message(t('Unsubscribe process failed. You probably don\'t have such subscription'), 'error');
+  }
+
+  drupal_goto($path_info['path'], $path_info);
+}
+
+
+/**
+ * Parse the path and extract params
+ */
+function pwb_subscribe_parse_url( $path) {
+  $path_info = drupal_parse_url( $path);
+  $url_params = explode('/', $path_info['path']);
+
+  $params = array();
+  $params['filter'] = array();
+  $params['keys'] = '';
+
+  $subscription_type = PWB_SUBSCRIBE_TYPE_UNKNOWN;
+
+  $base = array_shift($url_params);
+  if ($base == 'taxonomy' && array_shift($url_params) == 'term') {
+    // Section page
+    $subscription_type = PWB_SUBSCRIBE_TYPE_SECTION;
+    $params['filter'][] = 'im_field_section:' . array_shift($url_params);
+
+// XXX by Specification no mountain tags are used in subscription
+//    $mountain_tags = array_shift($url_params);
+//    if ($mountain_tags) {
+//      $mountain_tids = explode('+', $mountain_tags);
+//      foreach ($mountain_tids as $m_tid) {
+//        $params['filter'][] = 'im_field_mountain_tags:' . $m_tid;
+//      }
+//    }
+  }
+  elseif ($base == 'search' && array_shift($url_params) == 'personaleweb' ) {
+    // Search page
+    $subscription_type = PWB_SUBSCRIBE_TYPE_SEARCH;
+    $params['keys'] = array_shift($url_params);
+    $params['filter'] = isset($path_info['query']['f']) ? $path_info['query']['f'] : array();
+  }
+
+  return array($subscription_type, $params);
+}
+
+
+/**
+ *  Building the search params array
+ */
+function pwb_subscribe_build_search_params( $path) {
+  $search = array();
+
+  list($subscription_type, $params) = pwb_subscribe_parse_url( $path);
+
+  $search['keys'] = $params['keys'];
+  $search['filters'] = $params['filter'];
+  $search['sort'] = Null;
+  $search['path'] = Null;
+
+  return array($subscription_type, $search);
+}
+
+
+/**
+ * Search the SOLR instance
+ */
+function pwb_subscribe_search(Array $search) {
+  // The search work with pagination always so to get all results we need to fake it
+  // We would search several times till out of pages and combine results
+
+  $results = array();
+  $page = 0;
+  $rows = variable_get('pdb_subscribe_results_rows', 5);
+
+  $params = array(
+      'rows'  => $rows,
+      'q'     => $search['keys'],
+      'fq'    => $search['filters'],
+      'facet' => 'true',
+      'fl'    => array(
+        'im_field_section',
+        'im_field_tema',
+        'sm_vid_Paramount_tags',
+        'is_field_image',
+        'im_field_mountain_tags',
+        'tm_field_location',
+        'dm_field_date',
+        'dm_field_date_end',
+      ),
+    );
+
+    $tmp_results = array();
+    $tmp_results = apachesolr_search_run('apachesolr', $params, $search['sort'], $search['path'], $page);
+
+    if ($tmp_results) {
+      $results = array_merge($results, $tmp_results);
+      $page++;
+    }
+    else {
+      return $results;
+    }
+
+  return $results;
+}
+
+
+/**
+ *  Transform pwb_subscribe_parse_url() result
+ *  in readable by humans form
+ *
+ *  Transform solr identificators with Names like: Section and Mountain tags
+ *  Load the tags by there ids
+ */
+function pwb_subscribe_humanize_filters($filters) {
+  $humanized_filters = array();
+  foreach ($filters as $filter) {
+    $tmp = explode(':', $filter);
+    $tag = taxonomy_term_load($tmp[1]);
+
+    if ($tmp[0] == 'im_field_section') {
+      $humanized_filters['section']['name']  = t('Section');
+      $humanized_filters['section']['data'][] = $tag;
+    }
+    elseif ($tmp[0] == 'im_field_mountain_tags') {
+      $humanized_filters['mountain_tags']['name']  = t('Mountain tags');
+      $humanized_filters['mountain_tags']['data'][] = $tag;
+    }
+    elseif ($tmp[0] == 'im_field_role') {
+      $humanized_filters['role']['name'] = t('Role');
+      $humanized_filters['role']['data'][] = $tag;
+    }
+    elseif ($tmp[0] == 'im_field_organization') {
+      $humanized_filters['organization']['name'] = t('Organization');
+      $humanized_filters['organization']['data'][] = $tag;
+    }
+    elseif ($tmp[0] == 'im_field_organization_region') {
+      $humanized_filters['organization_region']['name'] = t('Organization Region');
+      $humanized_filters['organization_region']['data'][] = $tag;
+    }
+    elseif ($tmp[0] == 'im_field_organization_other') {
+      $humanized_filters['organization_other']['name'] = t('Organization other');
+      $humanized_filters['organization_other']['data'][] = $tag;
+    }
+  }
+
+  return $humanized_filters;
+}
+
+
+/**
+ *  Create Label for subscriptions
+ *  Transform the Solr Filter values to humanly readable format
+ *  Category: term_name1; [term_name2];  Category2: term_name1;... etc
+ *
+ *  Categories are: Section, Mountain tags ... etc
+ *
+ *  @param Array $filters - The Aray holding the filters data
+ *    returned from pwb_subscribe_parse_url()
+ */
+function pwb_subscribe_filters_label($filters) {
+  $names = pwb_subscribe_humanize_filters($filters);
+
+  $label = '';
+  foreach($names as $filter) {
+    $tags_names = '';
+    if (isset($filter['data']) && isset($filter['name'])) {
+      foreach($filter['data'] as $tag) {
+        $tags_names .= $tag->name . '; ';
+      }
+      $label .= $filter['name'] . ': ' . $tags_names . '   ';
+    }
+  }
+
+  return $label;
+}
+
+
+/**
+ * Implements hook_cron_queue_info()
+ */
+function pwb_subscribe_cron_queue_info() {
+  return array(
+    'pwb_subscribe_queue' => array(
+      'worker callback' => 'pwb_subscribe_queue_run',
+      'time'  => 120,
+    )
+  );
+}
+
+
+/**
+ * Implements hook_cron()
+ */
+function pwb_subscribe_cron() {
+  module_load_include("inc", "pwb_subscribe", "pwb_subscribe.email");
+
+  $queue = DrupalQueue::get('pwb_subscribe_queue');
+
+  $last_run = variable_get('pwb_subscribe_last_run', time() - 610000); // Default before 1 week without an hour and half  so we can show something for first time
+
+  if(variable_get('pwb_subscribe_skip_check', True)) {
+    $last_run = time() - 610000;
+  }
+
+  if($last_run < time() - 604800) {
+    $subscriptions = pwb_subscribe_load_subscriptions();
+    foreach ($subscriptions as $key => $sub) {
+      $data = array(
+        'email' => $key,
+        'token' => current(current($sub))->token,
+        'last_run'  => $last_run,
+        'subscription_data' => $sub
+      );
+      $queue->createItem($data);
+    }
+    variable_set('pwb_subscribe_last_run', time());
+  }
+}
+
+
+/**
+ * Callback for proccessing Subscription Queue
+ */
+function pwb_subscribe_queue_run( $data) {
+  module_load_include("inc", "pwb_subscribe", "pwb_subscribe.email");
+
+  $output = '';
+  $section_results = array();
+  $search_results = array();
+
+  $output .= '<div class="mail-header">' . variable_get('pwb_subscribe_email_header', t('Your subscriptions for the last Week')) . "</div>";
+
+  $email = $data['email'];
+  $subscriptions = $data['subscription_data'];
+  $last_run = $data['last_run'];
+
+  // We need to add Search by Date newer then
+  $date = date('Y-m-d\TH:i:s\Z', $last_run);
+
+  $section_subscriptions  = isset($subscriptions[PWB_SUBSCRIBE_TYPE_SECTION]) ? $subscriptions[PWB_SUBSCRIBE_TYPE_SECTION] : array();
+  $search_subscriptions   = isset($subscriptions[PWB_SUBSCRIBE_TYPE_SEARCH]) ? $subscriptions[PWB_SUBSCRIBE_TYPE_SEARCH] : array();
+
+  foreach($section_subscriptions as $obj) {
+    $search = json_decode($obj->search_params, TRUE);
+    $search['filters'][] = 'ds_changed:['. $date .' TO *]';
+
+    $results = pwb_subscribe_search($search, $last_run);
+
+    $label = pwb_subscribe_filters_label($search['filters']);
+    $sub_output = theme('simple_search_results', array(
+        'results' => $results,
+        'module' => 'pwb_subscribe',
+        'results_title' => $label,
+        'image_style' => 'pweb_small',
+        'enable_see_more' => False,
+        'see_more_link_text' => '',
+        'see_more_link_points_to' => '',
+        'type_of_search' => 'pwb_subscribe_search_result',
+        'pwb_date_formats' => 'search_personaleweb',
+      ));
+
+    $output .= $sub_output;
+
+  }
+
+  foreach($search_subscriptions as $obj) {
+    $search = json_decode($obj->search_params, TRUE);
+    $search['filters'][] = 'ds_changed:['. $date .' TO *]';
+
+    $results = pwb_subscribe_search($search, $last_run);
+
+    $label = pwb_subscribe_filters_label($search['filters']);
+    $sub_output = theme('simple_search_results', array(
+        'results' => $results,
+        'module' => 'pwb_subscribe',
+        'results_title' => $label,
+        'image_style' => 'pweb_small',
+        'enable_see_more' => False,
+        'see_more_link_text' => '',
+        'see_more_link_points_to' => '',
+        'type_of_search' => 'pwb_subscribe_search_result',
+        'pwb_date_formats' => 'search_personaleweb',
+      ));
+
+    $output .= $sub_output;
+  }
+
+  $token = $data['token'];
+
+  $output .= pwb_subscribe_email_news_list($last_run);
+
+  $output .= variable_get('pwb_subscribe_email_unsubscribe_message', t('If you want to unsubscrube from some or all of the lists please follow this link: '));
+  $output .= l('Unsubscribe', 'subscriptions/list/' . $token);
+
+  $entity = Null;
+  $context = array(
+    'recipient' => $email,
+    'subject'   => variable_get('pwb_subscribe_email_subject', t('Personale Web Weekly Subscriptions')),
+    'message'   => $output,
+  );
+
+  // Send the email
+  system_send_email_action($entity, $context);
+}
+
+
+/**
+ * Ask the Apache Solr to return the lattest news
+ */
+function pwb_subscribe_get_news( $last_run) {
+  $keys = ' ';
+  $date = date('Y-m-d\TH:i:s\Z', $last_run);
+
+  $query = apachesolr_drupal_query($keys);
+
+  $query->addParam('rows', variable_get('pwb_subscribe_email_news_list_rows', 5));
+
+  $query->addFilter('ds_changed', '[' . $date .' TO *]');
+  $query->addFilter('bs_promote', 1); // Only promoted to frontpage
+  $query->addFilter('bundle', 'news'); // News type only
+
+  $params = $query->getParams();
+
+  $params['fl'] = array(
+    'im_field_section',
+    'im_field_tema',
+    'sm_vid_Paramount_tags',
+    'is_field_image',
+    'im_field_mountain_tags',
+    'tm_field_location',
+    'dm_field_date',
+    'dm_field_date_end',
+  );
+
+  $results = apachesolr_search_run('apachesolr', $params, '', Null, 0);
+
+  return $results;
+}
+
+
+/**
+ * Build lattest news list
+ */
+function pwb_subscribe_email_news_list( $last_run) {
+  $results = pwb_subscribe_get_news( $last_run);
+
+  $label = t('Lattest News');
+
+  $sub_output = theme('simple_search_results', array(
+    'results' => $results,
+    'module' => 'pwb_subscribe',
+    'results_title' => $label,
+    'image_style' => 'pweb_small',
+    'enable_see_more' => False,
+    'see_more_link_text' => '',
+    'see_more_link_points_to' => '',
+    'type_of_search' => 'pwb_subscribe_search_result',
+    'pwb_date_formats' => 'search_personaleweb',
+  ));
+
+  return $sub_output;
+}

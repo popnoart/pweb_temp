@@ -1,0 +1,13 @@
+name = Personaleweb Imagesettings
+description = Imagestyles
+core = 7.x
+package = PWB
+php = 5.2.4
+version = 7.x-1.0
+project = pwb_imagesettings
+dependencies[] = image
+features[features_api][] = api:1
+features[image][] = pweb_large
+features[image][] = pweb_medium
+features[image][] = pweb_search
+features[image][] = pweb_small

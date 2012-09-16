@@ -1,0 +1,13 @@
+name = ProPeople Facet Dropdown
+description = ProPeople dropdown facet widget for facet searches
+core = 7.x
+package = Propeople
+dependencies[] = apachesolr_search
+dependencies[] = facetapi
+
+files[] = prp_facet_dropdown.module
+files[] = prp_facet_dropdown.admin.inc
+files[] = PRP_Facet_Dropdown_Facetapi_Widget.php
+files[] = prp_facet_dropdown.js
+
+configure = admin/config/prp_facet_dropdown/settings

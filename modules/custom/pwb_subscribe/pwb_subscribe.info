@@ -1,0 +1,13 @@
+name = Pwb subscribe
+description = "Module description"
+core = 7.x
+package = ProPeople
+
+dependencies[] = pwb_search
+dependencies[] = mimemail
+
+files[] = pwb_subscribe.module
+files[] = pwb_subscribe.email.inc
+files[] = pwb_subscribe.rss.inc
+files[] = pwb_subscribe.install
+files[] = templates/pwb-subscribe-search-result.tpl.php

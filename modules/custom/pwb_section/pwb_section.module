@@ -1,0 +1,373 @@
+<?php
+
+/**
+ * Created on June 18, 2012
+ *
+ * @file
+ *
+ * pwb_section.module
+ * @author Lachezar Valchev
+ * <lachezar@propeople.dk>
+ *
+ * @version 1.0
+ */
+
+define('PWB_SECTION_WATCHDOG_TYPE', 'PWB Section');
+
+/**
+ * Implements hook_help().
+ */
+function pwb_section_help($path, $arg) {
+  $output = '';
+  switch ($path) {
+    case "admin/help#pwb_section":
+      $output = 'The module will implement custom functionality to list and filter by taxonomy terms very similar to what the facets do.';
+      break;
+    case 'pwb_section#noresults':
+      return t('No results');
+  }
+
+  return $output;
+}
+
+/**
+ * Implements hook_menu().
+ *
+ * Add two tabs for domain settings.
+ */
+function pwb_section_menu() {
+  return array(
+    'admin/config/pwb_section' => array(
+      'title' => 'PWB Section',
+      'description' => 'PWB Section settings.',
+      'position' => 'left',
+      'weight' => -20,
+      'page callback' => 'system_admin_menu_block_page',
+      'access arguments' => array('access administration pages'),
+      'file' => 'system.admin.inc',
+      'file path' => drupal_get_path('module', 'system'),
+    ),
+    'admin/config/pwb_section/settings' => array(
+      'title' => 'PWB Section settings',
+      'description' => 'The admin page for the PWB Section module.',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('pwb_section_config_form'),
+      'access arguments' => array('administer pwb section'),
+      'file' => 'pwb_section.admin.inc',
+      'type' => MENU_NORMAL_ITEM,
+    ),
+    'ajax/section/%' => array(
+      'title' => '',
+      'page callback' => 'pwb_section_ajax_callback',
+      'page arguments' => array(2),
+      'access callback' => TRUE,
+      'type' => MENU_CALLBACK,
+    ),
+  );
+}
+
+/**
+ * Implements hook_permission().
+ */
+function pwb_section_permission() {
+  return array(
+    'administer pwb section' => array(
+      'title' => t('Administer PWB section'),
+      'description' => t('Administer PWB section'),
+    ),
+  );
+}
+
+/**
+ * Whenever the debug constant is enabled the function will set watchdog messages.
+ *
+ * @param string $type
+ * @param string $message
+ * @param array $variables
+ * @param string $severity
+ */
+function pwb_section_watchdog_custom($type, $message, $variables = array(), $severity = WATCHDOG_DEBUG) {
+  if (variable_get('pwb_section_debug', 0) == 1) {
+    watchdog($type, $message, $variables, $severity);
+  }
+}
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function pwb_section_ctools_plugin_directory($owner, $plugin_type) {
+  if ($owner == 'ctools' && $plugin_type == 'content_types') {
+    return 'plugins/' . $plugin_type;
+  }
+}
+
+/**
+ * Custom search function
+ *
+ * @param array $conf
+ * @param string $keys
+ */
+function pwb_section_do_search($conf, $keys) {
+  global $language;
+
+  $search_page = '';
+  $conditions = array();
+  $params = array();
+  $results = array();
+  $response = array();
+
+  // Get the search page
+  $search_page = apachesolr_search_page_load('core_search');
+
+  // Define the search conditions
+  if ($conditions == NULL || empty($conditions)) {
+    // Add default search conditions
+    $conditions = apachesolr_search_conditions();
+  }
+
+  // Add custom conditions
+  // Paramount tag
+  if (isset($conf['paramount_tag']) && !empty($conf['paramount_tag'])) {
+    $conditions['fq'][] = 'im_field_section:' . $conf['paramount_tag'];
+  }
+
+  // Mountain tags.
+  if (isset($conf['mountain_tags']) && !empty($conf['mountain_tags'])) {
+    $conditions['fq'][] = pwb_section_add_custom_conditions($conf['mountain_tags'], 'im_field_mountain_tags', 'AND');
+  }
+
+  if (isset($_GET['fq'])) {
+    $conditions['fq'][] = $_GET['fq'];
+  }
+
+  // Check our parameters
+  if (empty($conditions) || empty($search_page)) {
+    apachesolr_failure(t('Solr search'), $keys);
+  }
+
+  // Sort options from the conditions array.
+  // @see apachesolr_search_conditions_default()
+  //   See This condition callback to find out how.
+  $solrsort = isset($conditions['apachesolr_search_sort']) ? $conditions['apachesolr_search_sort'] : '';
+
+  // What to do when we have an initial empty search
+  $empty_search_behavior = (isset($keys) && !empty($keys)) ? 'browse' : 'results';
+
+  try {
+    // Get the solr object
+    $solr = apachesolr_get_solr($search_page->env_id);
+
+    // Define parameters
+    // Filters
+    $params['fq'] = isset($conditions['fq']) ? $conditions['fq'] : array();
+
+    // Results per page
+    $params['rows'] = (isset($conf['rows_per_page']) && !empty($conf['rows_per_page'])) ? $conf['rows_per_page'] : $search_page->settings['apachesolr_search_per_page'];
+
+    $params['facet'] = 'true';
+    $params['facet.field'][] = 'im_field_mountain_tags';
+    $params['override_mincount'] = TRUE;
+
+    // Spellcheck
+    if (empty($search_page->settings['apachesolr_search_spellcheck'])) {
+      // Spellcheck needs to have a string as false/true
+      $params['spellcheck'] = 'false';
+    }
+    else {
+      $params['spellcheck'] = 'true';
+    }
+
+    // Empty text Behavior
+    if (!isset($keys) && !isset($conditions['f']) && ($empty_search_behavior == 'browse' || $empty_search_behavior == 'blocks')) {
+      // Pass empty search behavior as string on to apachesolr_search_search_page()
+      // Hardcoded apachesolr name since we rely on this for the facets
+      apachesolr_search_run_empty('apachesolr', $params, $search_page->search_path, $solr);
+
+      $results['apachesolr_search_browse'] = 'results';
+
+      if ($empty_search_behavior == 'browse') {
+        // Hide sidebar blocks for content-area browsing instead.
+        apachesolr_suppress_blocks($search_page->env_id, TRUE);
+      }
+    }
+    // Full text behavior. Triggers with a text search or a facet
+    elseif (($keys || isset($conditions['f'])) || ($empty_search_behavior == 'results')) {
+      $params['q'] = $keys;
+      // Hardcoded apachesolr name since we rely on this for the facets
+      //TODO: Check why the search_path is search/site?
+      $results = apachesolr_search_run('apachesolr', $params, $solrsort, $search_page->search_path, pager_find_page(), $solr);
+    }
+  }
+  catch (Exception $e) {
+    watchdog('Apache Solr', nl2br(check_plain($e->getMessage())), NULL, WATCHDOG_ERROR);
+    apachesolr_failure(t('Solr search'), $keys);
+  }
+
+  $query = apachesolr_current_query($search_page->env_id);
+  $searcher = $query->getSearcher();
+  $response = apachesolr_static_response_cache($searcher);
+
+  return array($results, $response);
+}
+
+/**
+ * Alter the query after it's prepared and cached.
+ *
+ * Any module performing a search should call
+ * drupal_alter('apachesolr_query', $query). That function then invokes this
+ * hook. It allows modules to modify the query object and its parameters.
+ *
+ * A module implementing HOOK_apachesolr_query_alter() may set
+ * $query->abort_search to TRUE to flag the query to be aborted.
+ *
+ * @param object $query
+ *   An object implementing DrupalSolrQueryInterface. No need for &.
+ */
+function pwb_section_apachesolr_query_alter($query) {
+  $override_mincount = $query->getParams('override_mincount');
+
+  if (!empty($override_mincount)) {
+    $query->replaceParam('f.im_field_mountain_tags.facet.mincount', 0);
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function pwb_section_theme($existing, $type, $theme, $path) {
+  return array(
+    'mountain_tags_listing' => array(
+      'variables' => array(
+        'selected_tags' => NULL,
+        'not_selected_tags' => NULL,
+        'module' => NULL,
+        'paramount_tag' => NULL
+      ),
+      'template' => 'mountain-tags-listing',
+      'path' => drupal_get_path('module', 'pwb_section') . '/templates',
+    )
+  );
+}
+
+/**
+ * Process variables for pwb-section-mountain-tags-listing.tpl.php.
+ *
+ * The $variables array contains the following arguments:
+ * - $results: Search results array.
+ * - $module: Module the search results came from (module implementing
+ *   hook_search_info()).
+ *
+ * @see pwb-section-mountain-tags-listing.tpl.php
+ */
+function template_preprocess_mountain_tags_listing(&$variables) {
+  $variables['redirect_url'] = url('taxonomy/term/' . $variables['paramount_tag']);
+  $variables['theme_hook_suggestions'][] = 'mountain_tags_listing__' . $variables['module'];
+}
+
+/**
+ * Implements hook_url_inbound_alter().
+ */
+function pwb_section_url_inbound_alter(&$path, $original_path, $path_language) {
+  $term_objs = array();
+  $mountain_tags = array();
+  $mountain_tags_tids = '';
+
+  if ($path == $original_path) {
+    $path_parts = explode('/', $path);
+    if ($path_parts[0] == 'section') {
+      $source_path = implode('/', array($path_parts[0], $path_parts[1]));
+      $source = drupal_lookup_path('source', $source_path, $path_language);
+      if (strpos($source, 'taxonomy/term') !== FALSE) {
+        unset($path_parts[0]);
+        unset($path_parts[1]);
+        foreach ($path_parts as $next_term) {
+          // TODO: Make it setting - the vocabulary
+          $term_objs = taxonomy_get_term_by_name($next_term, 'mountain_tags');
+          if (isset($term_objs) && !empty($term_objs)) {
+            $mountain_tags[] = reset(array_keys($term_objs));
+          }
+        }
+
+        $mountain_tags_tids = implode('+', $mountain_tags);
+      }
+
+      $path = $source . '/' . $mountain_tags_tids;
+    }
+  }
+}
+
+/**
+ * Custom callback function for requests coming from the ajax call for the
+ * mountain tags selection
+ *
+ * @param unknown_type $paramount
+ */
+function pwb_section_ajax_callback($paramount) {
+  module_load_include('inc', 'ctools', 'page_manager/plugins/tasks/term_view');
+  module_load_include('inc', 'ctools', 'page_manager/plugins/tasks/page');
+  $prepared_json_array = array();
+  $additional_params = func_get_args();
+
+  $keys = '';
+  $conf['paramount_tag'] = (isset($paramount) && !empty($paramount)) ? $paramount : '';
+  $conf['mountain_tags'] = (isset($additional_params[1]) && !empty($additional_params[1])) ? explode(' ', $additional_params[1]) : '';
+
+  list($results, $response) = pwb_section_do_search($conf, $keys);
+
+  $active_mountain_tags = $response->facet_counts->facet_fields->im_field_mountain_tags;
+  if (isset($active_mountain_tags) && !empty($active_mountain_tags)) {
+    foreach ($active_mountain_tags as $tag_id => $item) {
+      $term_obj = taxonomy_term_load($tag_id);
+      if ($term_obj !== FALSE) {
+        if ($item != 0) {
+          $prepared_json_array['clickable_tags'][$term_obj->tid] = $term_obj->name;
+        }
+        else {
+          $prepared_json_array['not_clickable_tags'][$term_obj->tid] = $term_obj->name;
+        }
+      }
+    }
+  }
+
+  if (isset($conf['mountain_tags']) && !empty($conf['mountain_tags'])) {
+    $prepared_json_array['html'] = render(page_manager_page_execute('section_and_mointain_tags'));
+  }
+  else {
+    $term = taxonomy_term_load($conf['paramount_tag']);
+    $prepared_json_array['html'] = render(page_manager_term_view_page($term));
+  }
+
+  drupal_json_output($prepared_json_array);
+}
+
+/**
+ * Preparing filter query arguments the way they are needed from the search.
+ *
+ * @param array $condition
+ * @param string $field_index_name
+ * @param string $operator
+ *
+ * @return Ambigous <multitype:, string>
+ */
+function pwb_section_add_custom_conditions($condition, $field_index_name, $operator) {
+  $filtered_conditions = array();
+  $return_condition = array();
+
+  if (!empty($condition)) {
+    foreach ($condition as $condition_id => $condition_value) {
+      if ($condition_value !== 0) {
+        $filtered_conditions[$condition_id] = $condition_value;
+      }
+    }
+    if (!empty($filtered_conditions)) {
+      if (count($filtered_conditions) > 1) {
+        $return_condition = $field_index_name . ':(' . implode(' ' . $operator . ' ', $filtered_conditions) . ')';
+      }
+      else {
+        $return_condition = $field_index_name . ':(' . reset($filtered_conditions) . ')';
+      }
+    }
+  }
+
+  return $return_condition;
+}

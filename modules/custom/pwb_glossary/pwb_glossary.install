@@ -1,0 +1,13 @@
+<?php
+
+
+/**
+ * Module pwb_glossary
+ * @file
+ * pwb_glossary.install
+ */
+
+function pwb_glossary_schema() {
+  $schema['cache_pwb_glossary'] = drupal_get_schema_unprocessed('system', 'cache');
+  return $schema;
+}

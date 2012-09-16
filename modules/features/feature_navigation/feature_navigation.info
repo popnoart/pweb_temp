@@ -1,0 +1,13 @@
+name = Navigation
+description = Feature for Navigation - contain menus, links and other connected to navigation stuff
+core = 7.x
+package = PWB
+php = 5.2.4
+dependencies[] = features
+dependencies[] = menu
+features[features_api][] = api:1
+features[menu_custom][] = menu-footer-menu
+features[menu_custom][] = user-menu
+features[menu_links][] = user-menu:<front>
+features[menu_links][] = user-menu:user
+features[menu_links][] = user-menu:user/logout

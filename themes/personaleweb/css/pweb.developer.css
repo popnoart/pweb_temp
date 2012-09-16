@@ -1,0 +1,20 @@
+/* Developer styles go here */
+.hide_button,
+input.hide_checkbox {
+  display: none;
+}
+
+pre {
+  background: yellow;
+  color: black;
+  font-family: monospace;
+  padding: 4px;
+  font-size: 10px;
+}
+
+.pwb_search-results .list-item {
+  position: relative;
+}
+
+.context-block-region { display:none; }
+.context-block { display:none !important; }

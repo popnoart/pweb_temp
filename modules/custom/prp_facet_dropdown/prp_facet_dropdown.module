@@ -1,0 +1,236 @@
+<?php
+
+/**
+ * Created on June 25, 2012
+ *
+ * @file
+ *
+ * prp_facet_dropdown.module
+ * @author Lachezar Valchev
+ * <lachezar@propeople.dk>
+ *
+ * @version 1.0
+ */
+
+define('PRP_FACET_DROPDOWN_WATCHDOG_TYPE', 'PRP Facet Dropdown');
+
+/**
+ * Implements hook_help().
+ */
+function prp_facet_dropdown_help($path, $arg) {
+  $output = '';
+  switch ($path) {
+    case "admin/help#prp_facet_dropdown":
+      $output = 'The module will implement custom widget that will provide additional functionality to the standart FacetAPI module. It will provide a date picker widget that allows the user to select terms from dropdown.';
+      break;
+  }
+  return $output;
+}
+
+/**
+ * Whenever the debug constant is enabled the function will set watchdog messages.
+ *
+ * @param string $type
+ * @param string $message
+ * @param array $variables
+ * @param string $severity
+ */
+function prp_facet_dropdown_watchdog_custom($type, $message, $variables = array(), $severity = WATCHDOG_DEBUG) {
+  if (variable_get('prp_facet_dropdown_debug', 0) == 1) {
+    watchdog($type, $message, $variables, $severity);
+  }
+}
+
+/**
+ * Implements hook_menu().
+ */
+function prp_facet_dropdown_menu() {
+  return array(
+    'admin/config/prp_facet_dropdown' => array(
+      'title' => 'PRP Facet Dropdown',
+      'description' => 'PRP Facet Dropdown settings.',
+      'position' => 'left',
+      'weight' => -20,
+      'page callback' => 'system_admin_menu_block_page',
+      'access arguments' => array('access administration pages'),
+      'file' => 'system.admin.inc',
+      'file path' => drupal_get_path('module', 'system'),
+    ),
+    'admin/config/prp_facet_dropdown/settings' => array(
+      'title' => 'PRP Facet Dropdown settings',
+      'description' => 'The admin page for the PRP Facet Dropdown module.',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('prp_facet_dropdown_config_form'),
+      'access arguments' => array('administer prp facet dropdown'),
+      'file' => 'prp_facet_dropdown.admin.inc',
+      'type' => MENU_NORMAL_ITEM,
+    ),
+  );
+}
+
+/**
+ * Implements hook_permission().
+ */
+function prp_facet_dropdown_permission() {
+  return array(
+    'administer prp facet dropdown' => array(
+      'title' => t('Administer PRP Facet Dropdown'),
+      'description' => t('Administer PRP Facet Dropdown'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_facetapi_widgets().
+ */
+function prp_facet_dropdown_facetapi_widgets() {
+  module_load_include('php', 'prp_facet_dropdown', 'PRP_Facet_Dropdown_Facetapi_Widget');
+
+  return array(
+    'prp_facet_dropdown' => array(
+      'handler' => array(
+        'label' => t('Select dropdown'),
+        'class' => 'PrpFacetDropdownWidget',
+        'query types' => array('term', 'date'),
+      ),
+    ),
+  );
+}
+
+/**
+ * Implements hook_forms().
+ */
+function prp_facet_dropdown_forms($form_id, $args) {
+  if (strpos($form_id, 'facetapi_select_form') !== FALSE) {
+    $forms[$form_id]= array(
+      'callback' => 'prp_facet_dropdown_facetapi_select_form',
+    );
+
+    return $forms;
+  }
+}
+
+/**
+ * The form for the custom facet widget.
+ *
+ * @param array $form
+ * @param array $form_state
+ * @param array $elements
+ * @param string $solr_field_name
+ * @param array $facet_settings
+ */
+function prp_facet_dropdown_facetapi_select_form($form, &$form_state, $elements, $solr_field_name, $facet_settings) {
+  $form = array();
+  $options = array();
+  $tags_to_show = array();
+
+  $form['selected_checkboxes'] = array(
+    '#prefix' => '<div class="selected-checkboxes">',
+    '#suffix' => '</div>',
+  );
+
+  if (isset($_GET['f']) && !empty($_GET['f'])) {
+    foreach ($_GET['f'] as $id => $item) {
+      if (strpos($item, $solr_field_name) !== FALSE) {
+        $term_id = trim(str_replace($solr_field_name . ':', '', $item));
+        $term_obj = taxonomy_term_load($term_id);
+        $form['selected_checkboxes']['mountain_tag_' . $term_obj->tid] = array(
+          '#type' => 'checkbox',
+          '#title' => $term_obj->name,
+          '#id' => 'mountain_tag_' . $term_obj->tid,
+          '#theme_wrappers' => array('form_element__prp_facet_dropdown_checkbox'),
+          '#attributes' => array(
+            'class' => array('hide_checkbox', 'tag-link', 'tag-selected'),
+          ),
+        );
+        $tags_to_show[$term_obj->tid] = $term_obj->tid;
+      }
+    }
+
+    $form['tags_to_show'] = array(
+      '#type' => 'value',
+      '#value' => $tags_to_show,
+    );
+  }
+
+  unset($elements[0]);
+  $options['_select_'] = t('-- Select --');
+  foreach ($elements as $value => $item) {
+    if (!in_array($item['#indexed_value'], array_keys($tags_to_show))) {
+      $options[$value] = $item['#markup'];
+    }
+  }
+
+  $form['prp_facet_dropdown'] = array(
+    '#type' => 'select',
+    '#default_value' => '',
+    '#options' => $options,
+    '#id' => 'prp-facet-dropdown-facets',
+  );
+
+  if ($facet_settings['view_all_link'] === 1) {
+    $form['vis_alle'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('View All'),
+      '#theme_wrappers' => array('form_element__prp_facet_dropdown_checkbox'),
+      '#attributes' => array(
+        'class' => array('hide_checkbox'),
+      ),
+    );
+  }
+
+  $form['#attached']['js'] = array(
+    drupal_get_path('module', 'prp_facet_dropdown') . '/prp_facet_dropdown.js',
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Search'),
+    '#attributes' => array(
+      'class' => array('hide_button'),
+    ),
+  );
+
+  return $form;
+}
+
+/**
+ * Submit function for prp_facet_dropdown_facetapi_select_form().
+ */
+function prp_facet_dropdown_facetapi_select_form_submit($form, &$form_state) {
+  $solr_field_name = $form_state['build_info']['args'][1];
+  $query = $_GET;
+  $query_q = $query['q'];
+  unset($query['q']);
+
+  if (isset($form_state['values']['vis_alle']) && $form_state['values']['vis_alle'] == 1 && isset($_GET['f'])) {
+    foreach ($_GET['f'] as $key => $value) {
+      $my_field = strpos($value, $solr_field_name);
+      if ($my_field !== FALSE) {
+        unset($query['f'][$key]);
+      }
+    }
+  }
+  else {
+    if ($form_state['values']['prp_facet_dropdown'] != '_select_') {
+      $query['f'][] = $solr_field_name . ':' . $form_state['values']['prp_facet_dropdown'];
+    }
+    else {
+      if (isset($form_state['values']['tags_to_show'])) {
+        foreach ($form_state['values']['tags_to_show'] as $tid => $item_tid) {
+          if (in_array('mountain_tag_' . $tid, array_keys($form_state['values'])) && $form_state['values']['mountain_tag_' . $tid] == 1) {
+            foreach ($_GET['f'] as $key => $value) {
+              $my_field = strpos($value, $solr_field_name);
+              $my_key = strpos($value, (string) $tid);
+              if ($my_field !== FALSE && $my_key !== FALSE) {
+                unset($query['f'][$key]);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  $form_state['redirect'] = array($query_q, array('query' => $query));
+}

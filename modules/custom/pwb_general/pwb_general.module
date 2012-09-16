@@ -1,0 +1,62 @@
+<?php
+
+/**
+ * Module pwb_general
+ * @file
+ * pwb_general.module
+ */
+
+function pwb_general_form_alter(&$form, &$form_state, $form_id) {
+  if ($form_id == 'campaignmonitor_subscribe_form') {
+    $form['unsubscribe'] = array(
+      '#type'  => 'submit',
+      '#value' => t('Unsubscribe'),
+      '#submit' => array('pwb_general_unsubscribe_list'),
+    );
+  }
+}
+
+
+function pwb_general_unsubscribe_list($form, &$form_state) {
+  $cm = CampaignMonitor::getConnector();
+
+  if (!empty($form_state['values']['email']) && !empty($form_state['values']['list_id'])) {
+    $status = $cm->unsubscribe($form_state['values']['list_id'], $form_state['values']['email']);
+    if ($status) {
+      drupal_set_message(t('You are now unsubscribed from the List'));
+    }
+    else {
+      form_set_error('', t('You were not unsubscribed from the list, please check email and try again.'));
+    }
+  }
+}
+
+
+/**
+ * Add permition to view unpublished content
+ */
+function pwb_general_permission() {
+  return array(
+    'unconditionally view unpublished content' => array(
+      'title' => t('View Unpublished Content'),
+      'restrict access' => TRUE
+    )
+  );
+}
+
+
+/**
+ *
+ */
+function pwb_general_node_access($node, $op, $account) {
+  // We're only bothered about the 'view' operation at the moment
+  if ($op == 'view') {
+    // If the user has access to our new permission, let 'em at it
+    if (user_access('unconditionally view unpublished content', $account)) {
+      return NODE_ACCESS_ALLOW;
+    }
+  }
+
+  // For everything else let the system decide.
+  return NODE_ACCESS_IGNORE;
+}

@@ -1,0 +1,31 @@
+<?php
+/**
+ * @file
+ * A module that adds possibility to use print button in views.
+ */
+
+/**
+ * Implementation of hook_views_api().
+ */
+function propeople_print_views_api() {
+  return array(
+    'api'   => 3,
+    'path' => drupal_get_path('module', 'propeople_print') . '/views',
+  );
+}
+
+/**
+ * Implementation of hook_views_data_alter().
+ */
+function propeople_print_views_data() {
+  $data = array();
+  // Print button.
+  $data['views']['propeople_print'] = array(
+    'field' => array(  
+      'title' => t('Print button'),
+      'help' => t('Print button provided by the print module.'),
+      'handler' => 'propeople_print_handler_field_print',
+    ),
+  );
+  return $data;
+}

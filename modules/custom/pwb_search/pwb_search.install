@@ -1,0 +1,27 @@
+<?php
+
+/**
+ * @file
+ */
+
+/**
+ * Implements hook_install().
+ */
+function pwb_search_install() {
+  variable_set('apachesolr_query_class', array(
+    'file' => 'Pwb_Solr_Base_Query',
+    'module' => 'pwb_search',
+    'class' => 'PwbSolrBaseQuery')
+  );
+}
+
+/**
+ * Add new class that extends SolrBaseQuery.
+ */
+function pwb_search_update_7001() {
+  variable_set('apachesolr_query_class', array(
+    'file' => 'Pwb_Solr_Base_Query',
+    'module' => 'pwb_search',
+    'class' => 'PwbSolrBaseQuery')
+  );
+}

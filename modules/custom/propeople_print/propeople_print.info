@@ -1,0 +1,11 @@
+name = Propeople print
+description = Add possibility to use the print block in views.
+core = 7.x
+package = ProPeople
+
+dependencies[] = views
+dependencies[] = block
+dependencies[] = print
+
+; Views handlers
+files[] = views/propeople_print_handler_field_print.inc

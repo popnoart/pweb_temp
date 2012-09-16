@@ -1,0 +1,18 @@
+name = PWB Section
+description = Custom pane for listing and filtering terms.
+core = 7.x
+package = Propeople
+
+dependencies[] = apachesolr_search
+dependencies[] = apachesolr
+dependencies[] = facetapi
+dependencies[] = search
+
+files[] = pwb_section.module
+files[] = pwb_section.admin.inc
+files[] = pwb_section.js
+files[] = plugins/content_types/mountain_tags.inc
+files[] = plugins/content_types/icon_search.png
+files[] = templates/mountain-tags-listing.tpl.php
+
+configure = admin/config/pwb_section/settings

@@ -1,0 +1,29 @@
+name = PWB Search
+description = Advanced search functionality.
+core = 7.x
+package = Propeople
+
+dependencies[] = apachesolr_search
+dependencies[] = apachesolr
+dependencies[] = facetapi
+dependencies[] = search
+
+files[] = pwb_search.module
+files[] = plugins/content_types/freetext_search.inc
+files[] = plugins/content_types/search_results.inc
+files[] = plugins/content_types/icon_search.png
+files[] = plugins/facetapi/url_processor_single_item.inc
+files[] = plugins/facetapi/adapter.inc
+files[] = templates/pwb-search-no-results.tpl.php
+files[] = templates/pwb-search-search-result.tpl.php
+files[] = templates/pwb-search-simple-search-results.tpl.php
+files[] = templates/pwb-search-section-tag-listing-search-results.tpl.php
+files[] = templates/pwb-search-section-news-search-results.tpl.php
+files[] = templates/pwb-search-section-events-search-results.tpl.php
+files[] = pwb_search.admin.inc
+files[] = pwb_search.inc
+files[] = pwb_search.install
+files[] = pwb_search.js
+files[] = Pwb_Solr_Base_Query.php
+
+configure = admin/config/pwb_search/settings

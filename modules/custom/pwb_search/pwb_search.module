@@ -1,0 +1,805 @@
+<?php
+
+/**
+ * Created on June 18, 2012
+ *
+ * @file
+ *
+ * pwb_search.module
+ * @author Lachezar Valchev
+ * <lachezar@propeople.dk>
+ *
+ * @version 1.0
+ */
+
+define('PWB_SEARCH_WATCHDOG_TYPE', 'PWB Search');
+
+/**
+ * Implements hook_help().
+ */
+function pwb_search_help($path, $arg) {
+  $output = '';
+  switch ($path) {
+    case "admin/help#pwb_search":
+      $output = 'The module will implement custom functionality to the standard and apachesolr search.';
+      break;
+    case 'pwb_search#noresults':
+      return t('No results');
+  }
+
+  return $output;
+}
+
+/**
+ * Implements hook_menu().
+ *
+ * Add two tabs for domain settings.
+ */
+function pwb_search_menu() {
+  return array(
+    'admin/config/pwb_search' => array(
+      'title' => 'PWB Search',
+      'description' => 'PWB Search settings.',
+      'position' => 'left',
+      'weight' => -20,
+      'page callback' => 'system_admin_menu_block_page',
+      'access arguments' => array('access administration pages'),
+      'file' => 'system.admin.inc',
+      'file path' => drupal_get_path('module', 'system'),
+    ),
+    'admin/config/pwb_search/settings' => array(
+      'title' => 'PWB Search settings',
+      'description' => 'The admin page for the PWB Search module.',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('pwb_search_config_form'),
+      'access arguments' => array('administer pwb search'),
+      'file' => 'pwb_search.admin.inc',
+      'type' => MENU_NORMAL_ITEM,
+    ),
+  );
+}
+
+/**
+ * Implements hook_permission().
+ */
+function pwb_search_permission() {
+  return array(
+    'administer pwb search' => array(
+      'title' => t('Administer PWB search'),
+      'description' => t('Administer PWB search'),
+    ),
+  );
+}
+
+/**
+ * Whenever the debug constant is enabled the function will set watchdog messages.
+ *
+ * @param string $type
+ * @param string $message
+ * @param array $variables
+ * @param string $severity
+ */
+function pwb_search_watchdog_custom($type, $message, $variables = array(), $severity = WATCHDOG_DEBUG) {
+  if (variable_get('pwb_search_debug', 0) == 1) {
+    watchdog($type, $message, $variables, $severity);
+  }
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function pwb_search_block_info() {
+  $blocks = array();
+
+  $blocks['pwb_search_block'] = array(
+    'info' => t('PWB Search block'),
+    'cache' => DRUPAL_CACHE_PER_PAGE,
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function pwb_search_block_view($delta = '') {
+  $block = array();
+
+  module_load_include('inc', 'pwb_search', 'pwb_search');
+  switch ($delta) {
+    case 'pwb_search_block':
+      $block['content'] = drupal_get_form('pwb_search_form');
+      break;
+  }
+
+  return $block;
+}
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function pwb_search_ctools_plugin_directory($owner, $plugin_type) {
+  if ($owner == 'ctools' && $plugin_type == 'content_types') {
+    return 'plugins/' . $plugin_type;
+  }
+}
+
+/**
+ * Performs the search.
+ *
+ * @param array $conf
+ * @param string $keys
+ * @return multitype:Optional Ambigous <multitype:string , stdClass, multitype:multitype:string array multitype: Ambigous <A, string> NULL Ambigous <An, string> multitype:unknown Ambigous <The, string>   >
+ */
+function pwb_search_do_search($conf, $keys) {
+  global $language;
+
+  $search_page = '';
+  $conditions = array();
+  $params = array();
+  $results = array();
+  $response = array();
+
+  // Get the search page
+  $search_page = apachesolr_search_page_load('core_search');
+
+  // Define the search conditions
+  if ($conditions == NULL || empty($conditions)) {
+    // Add default search conditions
+    $conditions = apachesolr_search_conditions();
+  }
+
+  // Add custom conditions
+  // Content Types
+  if (pwb_search_add_custom_conditions($conf['content_types'], 'bundle', 'OR')) {
+    $conditions['fq'][] = pwb_search_add_custom_conditions($conf['content_types'], 'bundle', 'OR');
+  }
+
+  // Mountain tags.
+  if (isset($conf['get_mountain_tags']) && !empty($conf['get_mountain_tags'])) {
+    $conditions['fq'][] = pwb_search_add_custom_conditions($conf['get_mountain_tags'], 'im_field_mountain_tags', 'OR');
+  }
+
+  // Paramount tag.
+  if (isset($conf['get_paramount_tag']) && !empty($conf['get_paramount_tag'])) {
+    $conditions['fq'][] = pwb_search_add_custom_conditions($conf['get_paramount_tag'], 'im_field_section', 'OR');
+  }
+
+  if (isset($_GET['fq'])) {
+    $conditions['fq'][] = $_GET['fq'];
+  }
+
+  if ((isset($conf['apachesolr_search_sort']) && $conf['apachesolr_search_sort'] == 1) || $conditions['apachesolr_search_sort']) {
+    $conditions['apachesolr_search_sort'] = 'ds_created desc';
+  }
+
+  // Check our parameters
+  if (empty($conditions) || empty($search_page)) {
+    apachesolr_failure(t('Solr search'), $keys);
+  }
+
+  // Sort options from the conditions array.
+  // @see apachesolr_search_conditions_default()
+  //   See This condition callback to find out how.
+  $solrsort = isset($conditions['apachesolr_search_sort']) ? $conditions['apachesolr_search_sort'] : '';
+
+  // What to do when we have an initial empty search
+  $empty_search_behavior = (isset($keys) && !empty($keys)) ? 'browse' : 'results';
+
+  try {
+    // Get the solr object
+    $solr = apachesolr_get_solr($search_page->env_id);
+
+    // Define parameters
+    // Filters
+    $params['fq'] = isset($conditions['fq']) ? $conditions['fq'] : array();
+
+    // Results per page
+    $params['rows'] = (isset($conf['rows_per_page']) && !empty($conf['rows_per_page'])) ? $conf['rows_per_page'] : $search_page->settings['apachesolr_search_per_page'];
+
+    $params['facet'] = 'true';
+    $params['fl'][] = 'im_field_section';
+    $params['fl'][] = 'im_field_tema';
+    $params['fl'][] = 'sm_vid_Paramount_tags';
+    $params['fl'][] = 'is_field_image';
+    $params['fl'][] = 'im_field_mountain_tags';
+    $params['fl'][] = 'tm_field_location';
+    $params['fl'][] = 'dm_field_date';
+    $params['fl'][] = 'dm_field_date_end';
+
+    // Spellcheck
+    if (empty($search_page->settings['apachesolr_search_spellcheck'])) {
+      // Spellcheck needs to have a string as false/true
+      $params['spellcheck'] = 'false';
+    }
+    else {
+      $params['spellcheck'] = 'true';
+    }
+
+    // Empty text Behavior
+    if (!isset($keys) && !isset($conditions['f']) && ($empty_search_behavior == 'browse' || $empty_search_behavior == 'blocks')) {
+      // Pass empty search behavior as string on to apachesolr_search_search_page()
+      // Hardcoded apachesolr name since we rely on this for the facets
+      apachesolr_search_run_empty('apachesolr', $params, $search_page->search_path, $solr);
+
+      $results['apachesolr_search_browse'] = 'results';
+
+      if ($empty_search_behavior == 'browse') {
+        // Hide sidebar blocks for content-area browsing instead.
+        apachesolr_suppress_blocks($search_page->env_id, TRUE);
+      }
+    }
+    // Full text behavior. Triggers with a text search or a facet
+    elseif (($keys || isset($conditions['f'])) || ($empty_search_behavior == 'results')) {
+      $params['q'] = $keys;
+      // Hardcoded apachesolr name since we rely on this for the facets
+      $results = apachesolr_search_run('apachesolr', $params, $solrsort, $search_page->search_path, pager_find_page(), $solr);
+
+    }
+  }
+  catch (Exception $e) {
+    watchdog('Apache Solr', nl2br(check_plain($e->getMessage())), NULL, WATCHDOG_ERROR);
+    apachesolr_failure(t('Solr search'), $keys);
+  }
+
+  $query = apachesolr_current_query($search_page->env_id);
+  $searcher = $query->getSearcher();
+  $response = apachesolr_static_response_cache($searcher);
+
+  return array($results, $response);
+}
+
+/**
+ * Implements hook_theme().
+ */
+function pwb_search_theme($existing, $type, $theme, $path) {
+  return array(
+    'simple_search_results' => array(
+      'variables' => array(
+        'results' => NULL,
+        'module' => NULL,
+        'response' => NULL,
+        'results_title' => NULL,
+        'rows_per_page' => NULL,
+        'suggested_words' => NULL,
+        'searched_keyword' => NULL,
+        'image_style' => NULL,
+        'enable_see_more' => NULL,
+        'see_more_link_text' => NULL,
+        'see_more_link_points_to' => NULL,
+        'type_of_search' => NULL,
+        'pwb_date_formats' => NULL,
+      ),
+      'template' => 'pwb-search-simple-search-results',
+      'path' => drupal_get_path('module', 'pwb_search') . '/templates',
+    ),
+    'pwb_search_search_result' => array(
+      'variables' => array(
+        'result' => NULL,
+        'module' => NULL,
+        'image_style' => NULL,
+        'result_number' => NULL,
+        'pwb_date_formats' => NULL,
+      ),
+      'template' => 'pwb-search-search-result',
+      'path' => drupal_get_path('module', 'pwb_search') . '/templates',
+    ),
+    'section_news_search_results' => array(
+      'variables' => array(
+        'results' => NULL,
+        'module' => NULL,
+        'result_number' => NULL,
+        'pwb_date_formats' => NULL,
+      ),
+      'template' => 'pwb-search-section-news-search-results',
+      'path' => drupal_get_path('module', 'pwb_search') . '/templates',
+    ),
+    'section_events_search_results' => array(
+      'variables' => array(
+        'results' => NULL,
+        'module' => NULL,
+        'result_number' => NULL,
+        'pwb_date_formats' => NULL,
+      ),
+      'template' => 'pwb-search-section-events-search-results',
+      'path' => drupal_get_path('module', 'pwb_search') . '/templates',
+    ),
+    'section_tag_listing_search_results' => array(
+      'variables' => array(
+        'results' => NULL,
+        'module' => NULL,
+        'result_number' => NULL,
+      ),
+      'template' => 'pwb-search-section-tag-listing-search-results',
+      'path' => drupal_get_path('module', 'pwb_search') . '/templates',
+    ),
+    'pwb_search_no_results' => array(
+      'variables' => array(
+        'module' => NULL,
+        'suggested_words' => NULL
+      ),
+      'template' => 'pwb-search-no-results',
+      'path' => drupal_get_path('module', 'pwb_search') . '/templates',
+    ),
+  );
+}
+
+/**
+ * Process variables for pwb-search-simple-search-results.tpl.php.
+ *
+ * The $variables array contains the following arguments:
+ * - $results: Search results array.
+ * - $module: Module the search results came from.
+ * - $response:
+ * - $results_title:
+ * - $rows_per_page:
+ * - $suggested_words:
+ * - $searched_keyword:
+ * - $image_style:
+ *
+ * @see pwb-search-simple-search-results.tpl.php
+ */
+function template_preprocess_simple_search_results(&$variables) {
+  global $pager_page_array;
+
+  $variables['search_results'] = '';
+
+  if (!empty($variables['module'])) {
+    $variables['module'] = check_plain($variables['module']);
+  }
+
+  switch ($variables['type_of_search']) {
+    case 'pwb_search_search_result':
+      foreach ($variables['results'] as $id => $result) {
+        $variables['search_results'] .= theme($variables['type_of_search'], array(
+          'result' => $result,
+          'module' => $variables['module'],
+          'image_style' => $variables['image_style'],
+          'pwb_date_formats' => $variables['pwb_date_formats'],
+        ));
+      }
+
+      pwb_search_create_pager($variables);
+
+      break;
+    case 'section_news_search_results':
+      foreach ($variables['results'] as $id => $result) {
+        $result_number = ((reset($pager_page_array) * count($variables['response']->response->docs)) + 1 + $id);
+        $variables['search_results'] .= theme($variables['type_of_search'], array(
+          'result' => $result,
+          'module' => $variables['module'],
+          'result_number' => $result_number,
+          'pwb_date_formats' => $variables['pwb_date_formats'],
+        ));
+      }
+
+      if (isset($variables['enable_see_more']) && $variables['enable_see_more'] == 1) {
+        $variables['see_more'] = l($variables['see_more_link_text'], ltrim($variables['see_more_link_points_to'], '/'));
+      }
+
+      break;
+    case 'section_events_search_results':
+      foreach ($variables['results'] as $id => $result) {
+        $result_number = ((reset($pager_page_array) * count($variables['response']->response->docs)) + 1 + $id);
+        $variables['search_results'] .= theme($variables['type_of_search'], array(
+          'result' => $result,
+          'module' => $variables['module'],
+          'result_number' => $result_number,
+          'pwb_date_formats' => $variables['pwb_date_formats'],
+        ));
+      }
+
+      if (isset($variables['enable_see_more']) && $variables['enable_see_more'] == 1) {
+        $variables['see_more'] = l($variables['see_more_link_text'], ltrim($variables['see_more_link_points_to'], '/'));
+      }
+
+      break;
+    case 'section_tag_listing_search_results':
+      foreach ($variables['results'] as $id => $result) {
+        $variables['search_results'] .= theme($variables['type_of_search'], array(
+          'result' => $result,
+          'module' => $variables['module'],
+          'image_style' => $variables['image_style'],
+        ));
+      }
+
+      pwb_search_create_pager($variables);
+
+      break;
+
+    case 'pwb_subscribe_search_result':
+      foreach ($variables['results'] as $id => $result) {
+        $variables['search_results'] .= theme($variables['type_of_search'], array(
+          'result' => $result,
+          'module' => $variables['module'],
+          'image_style' => $variables['image_style'],
+          'pwb_date_formats' => $variables['pwb_date_formats'],
+        ));
+      }
+      break;
+
+  }
+
+  $variables['theme_hook_suggestions'][] = 'simple_search_results__' . $variables['module'];
+}
+
+/**
+ * Process variables for pwb-search-section-news-search-results.tpl.php.
+ *
+ * The $variables array contains the following arguments:
+ * - $results: Search results array.
+ * - $module: Module the search results came from.
+ *
+ * @see pwb-search-section-news-search-results.tpl.php
+ */
+function template_preprocess_section_news_search_results(&$variables) {
+  $result = $variables['result'];
+  $result_fields = $result['fields'];
+  $variables['item_class'] = 'list-item';
+
+  if (isset($result_fields['entity_type']) && $result_fields['entity_type'] == 'node') {
+    $variables['result_date'] = format_date(strtotime($result_fields['ds_created']), $variables['pwb_date_formats']);
+    $variables['result_title'] = l($result_fields['label'], $result_fields['path']);
+
+    if ($variables['result_number'] == 1) {
+      $variables['result_snippet'] = $result['snippet'];
+    }
+  }
+
+  $variables['theme_hook_suggestions'][] = 'section_news_search_results__' . $variables['module'];
+}
+
+/**
+ * Process variables for pwb-search-simple-search-results.tpl.php.
+ *
+ * The $variables array contains the following arguments:
+ * - $results: Search results array.
+ * - $module: Module the search results came from.
+ *
+ * @see pwb-search-simple-search-results.tpl.php
+ */
+function template_preprocess_section_events_search_results(&$variables) {
+  $result = $variables['result'];
+  $result_fields = $result['fields'];
+  $variables['item_class'] = 'list-item';
+
+  if (isset($result_fields['entity_type']) && $result_fields['entity_type'] == 'node') {
+    $variables['result_title'] = l($result_fields['label'], $result_fields['path']);
+
+    if (isset($result_fields['tm_field_location'])) {
+      $variables['result_location'] = reset($result_fields['tm_field_location']);
+    }
+
+    $variables['result_tmp_dates']['begin_date'] = format_date(strtotime(reset($result_fields['dm_field_date'])), $variables['pwb_date_formats']);
+    $variables['result_tmp_dates']['end_date'] = format_date(strtotime(reset($result_fields['dm_field_date_end'])), $variables['pwb_date_formats']);
+
+    $variables['result_dates'] = implode(' - ', $variables['result_tmp_dates']);
+  
+    if ($variables['result_number'] == 1) {
+      $variables['result_snippet'] = $result['snippet'];
+    }
+  }
+
+  $variables['theme_hook_suggestions'][] = 'section_events_search_results__' . $variables['module'];
+}
+
+/**
+ * Process variables for pwb-search-simple-search-results.tpl.php.
+ *
+ * The $variables array contains the following arguments:
+ * - $results: Search results array.
+ * - $module: Module the search results came from.
+ *
+ * @see pwb-search-simple-search-results.tpl.php
+ */
+function template_preprocess_section_tag_listing_search_results(&$variables) {
+  $result = $variables['result'];
+  $result_fields = $result['fields'];
+  $variables['item_class'] = 'list-item';
+
+  if (isset($result_fields['entity_type']) && $result_fields['entity_type'] == 'node') {
+    // Load the specific entity
+    $variables['result_title'] = l($result_fields['label'], $result_fields['path']);
+    $variables['result_snippet'] = $result['snippet'];
+
+    if (isset($result_fields['is_field_image'])) {
+      $image_file = file_load($result_fields['is_field_image']);
+      if ($image_file) {
+        $variables['result_image'] = theme('image_style', array('style_name' => $variables['image_style'], 'path' => $image_file->uri));
+      }
+
+      $variables['item_class'] = 'list-item media-item';
+    }
+
+    if (isset($result_fields['im_field_tema']) && !empty($result_fields['im_field_tema'])) {
+      $node_obj = node_load(reset($result_fields['im_field_tema']));
+      if ($node_obj) {
+        $variables['result_tema'] = 'Tema: ' . l($node_obj->title, 'node/' . $node_obj->nid);
+      }
+    }
+  }
+
+  $variables['theme_hook_suggestions'][] = 'section_tag_listing_search_results__' . $variables['module'];
+}
+
+/**
+ * Process variables for visitdk-search-search-result.tpl.php.
+ *
+ * The $variables array contains the following arguments:
+ * - $result
+ * - $module
+ *
+ * @see pwb-search-search-result.tpl.php
+ */
+function template_preprocess_pwb_search_search_result(&$variables) {
+  $result = $variables['result'];
+  $result_fields = $result['fields'];
+  $variables['item_class'] = 'list-item';
+  $variables['info'] = array();
+  $variables['bottom_info'] = '';
+
+  if (isset($result_fields['entity_type']) && $result_fields['entity_type'] == 'node') {
+    // Load the specific entity
+    $variables['result_title'] = l($result_fields['label'], $result_fields['path']);
+    $variables['result_snippet'] = $result['snippet'];
+
+    if (isset($result_fields['is_field_image'])) {
+      $image_file = file_load($result_fields['is_field_image']);
+      if ($image_file) {
+        $variables['result_image'] = theme('image_style', array('style_name' => $variables['image_style'], 'path' => $image_file->uri));
+      }
+
+      $variables['item_class'] = 'list-item media-item-right';
+    }
+
+    if (isset($result_fields['im_field_section']) && !empty($result_fields['im_field_section'])) {
+      $variables['info']['result_paramount_tag'] = l(t(reset($result_fields['sm_vid_Paramount_tags'])), 'taxonomy/term/' . reset($result_fields['im_field_section']));
+    }
+
+    if (isset($result_fields['im_field_tema']) && !empty($result_fields['im_field_tema'])) {
+      $node_obj = node_load(reset($result_fields['im_field_tema']));
+      if ($node_obj) {
+        $variables['info']['result_tema'] = 'Tema: ' . l($node_obj->title, 'node/' . $node_obj->nid);
+      }
+    }
+
+    $variables['info']['result_content_type'] = $result_fields['bundle_name'];
+    $variables['info']['result_date'] = format_date(strtotime($result_fields['ds_created']), $variables['pwb_date_formats']);
+    $variables['bottom_info'] = implode(' - ', $variables['info']);
+  }
+
+  $variables['theme_hook_suggestions'][] = 'pwb_search_search_result__' . $variables['module'];
+}
+
+/**
+ * Process variables for visitdk-search-simple-search-results.tpl.php.
+ *
+ * The $variables array contains the following arguments:
+ * - $results: Search results array.
+ * - $module: Module the search results came from (module implementing
+ *   hook_search_info()).
+ *
+ * @see pwb-search-simple-search-results.tpl.php
+ */
+function template_preprocess_pwb_search_no_results(&$variables) {
+  if (!empty($variables['module'])) {
+    $variables['module'] = check_plain($variables['module']);
+  }
+
+  $variables['search_no_results'] = search_help('search#noresults', drupal_help_arg());
+
+  $variables['theme_hook_suggestions'][] = 'pwb_search_no_results__' . $variables['module'];
+}
+
+/**
+ * Implements hook_apachesolr_query_prepare().
+ */
+function pwb_search_apachesolr_query_prepare($query) {
+  $query->setQPath(TRUE);
+}
+
+/**
+ * Implements hook_facetapi_searcher_info_alter().
+ */
+function pwb_search_facetapi_searcher_info_alter(&$searcher_info) {
+  $searchers = array_keys($searcher_info);
+
+  foreach ($searchers as $searcher_name) {
+    $parts = explode('@', $searcher_name);
+    if ($parts[0] == 'apachesolr') {
+      $searcher_info[$searcher_name]['url processor'] = 'single_item_standard';
+      $searcher_info[$searcher_name]['adapter'] = 'pwb_search_adapter';
+    }
+  }
+}
+
+/**
+ * Implements hook_facetapi_url_processors().
+ */
+function pwb_search_facetapi_url_processors() {
+  return array(
+    'single_item_standard' => array(
+      'handler' => array(
+        'label' => t('Single enabled item URL processor'),
+        'class' => 'FacetapiUrlProcessorSingleItem',
+      ),
+    ),
+  );
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function pwb_search_form_alter(&$form, &$form_state, $form_id) {
+  if ($form_id == 'facetapi_facet_display_form') {
+    $adapter = $form['#facetapi']['adapter'];
+    $facet = $form['#facetapi']['facet'];
+    $realm = $form['#facetapi']['realm'];
+    $facet_settings = $adapter->getFacet($facet)->getSettings($realm);
+
+    $form['widget']['single_item'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Enable the single item functionality. It will prevent you to select multipel terms from one facet'),
+      '#default_value' => (isset($facet_settings->settings['single_item'])) ? $facet_settings->settings['single_item'] : 0,
+    );
+
+    $form['widget']['view_all_link'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Enable the "View all" links'),
+      '#default_value' => (isset($facet_settings->settings['view_all_link'])) ? $facet_settings->settings['view_all_link'] : 0,
+    );
+  }
+}
+
+/**
+ * Implements hook_facetapi_adapters().
+ */
+function pwb_search_facetapi_adapters() {
+  return array(
+    'pwb_search_adapter' => array(
+      'handler' => array(
+        'class' => 'FacetapiPwbSearchFacetapiAdapter',
+      ),
+    ),
+  );
+}
+
+/**
+ * Implements hook_facetapi_facet_info().
+ * Currently it only supports the node entity type
+ */
+function pwb_search_facetapi_facet_info($searcher_info) {
+  $facets = array();
+  if ('pwb_search_adapter' == $searcher_info['adapter']) {
+    $environment = apachesolr_environment_load($searcher_info['instance']);
+
+    if (!empty($environment['conf']['facet callbacks'])) {
+      foreach ($environment['conf']['facet callbacks'] as $callback) {
+        if (is_callable($callback)) {
+          $facets = array_merge($facets, call_user_func($callback, $searcher_info));
+        }
+      }
+    }
+    elseif (isset($searcher_info['types']['node'])) {
+      $facets = apachesolr_default_node_facet_info($searcher_info);
+    }
+  }
+
+  return $facets;
+}
+
+/**
+ * Preparing filter query arguments the way they are needed from the search.
+ *
+ * @param array $condition
+ * @param string $field_index_name
+ * @param string $operator
+ */
+function pwb_search_add_custom_conditions($condition, $field_index_name, $operator) {
+  $filtered_conditions = array();
+  $return_condition = array();
+
+  if (!empty($condition)) {
+    foreach ($condition as $condition_id => $condition_value) {
+      if ($condition_value !== 0) {
+        $filtered_conditions[$condition_id] = $condition_value;
+      }
+    }
+    if (!empty($filtered_conditions)) {
+      if (count($filtered_conditions) > 1) {
+        $return_condition = $field_index_name . ':(' . implode(' ' . $operator . ' ', $filtered_conditions) . ')';
+      }
+      else {
+        $return_condition = $field_index_name . ':(' . reset($filtered_conditions) . ')';
+      }
+    }
+  }
+
+  return $return_condition;
+}
+
+/**
+ * Implements hook_apachesolr_update_index().
+ *
+ * Build the documents before sending them to Solr.
+ *
+ * Supports all types of
+ * hook_apachesolr_index_document_build_' . $entity_type($documents[$id], $entity, $env_id);
+ *
+ * The function is the follow-up for apachesolr_update_index but then for
+ * specific entity types
+ *
+ * @param $document
+ * @param $entity
+ * @param $entity_type
+ */
+function pwb_search_apachesolr_index_document_build_node(ApacheSolrDocument $document, $entity, $env_id) {
+  if (isset($entity->field_image) && !empty($entity->field_image)) {
+    if (!empty($entity->field_image['und'][0]['fid'])) {
+      $field_info = array(
+        'index_type' => 'integer',
+        'multiple' => FALSE,
+        'name' => 'field_image',
+      );
+      $field_display_name_index_key = apachesolr_index_key($field_info);
+      $document->addField($field_display_name_index_key, $entity->field_image['und'][0]['fid']);
+    }
+  }
+}
+
+/**
+ * @param unknown_type $response
+ * @param unknown_type $variables
+ */
+function pwb_search_create_pager(&$variables) {
+  global $pager_page_array;
+
+  $response = $variables['response'];
+
+  if ($response->response->numFound) {
+    $start = ((reset($pager_page_array) * $variables['rows_per_page']) + 1);
+    $end = ($start + count($variables['results'])) - 1;
+    $variables['total_search_results'] = (!empty($variables['response'])) ? $variables['response']->response->numFound : '';
+    $variables['start_search_results'] = $start;
+    $variables['end_search_results'] = $end;
+    $variables['pager'] = theme('pager', array('tags' => NULL));
+  }
+  else {
+    $start = ((reset($pager_page_array) * $variables['rows_per_page']) + 1);
+    $end = ($start + count($variables['results'])) - 1;
+    $variables['total_search_results'] = (!empty($variables['response'])) ? $variables['response']->response->numFound : '';
+    $variables['start_search_results'] = $start;
+    $variables['end_search_results'] = $end;
+  }
+}
+
+/**
+ * Implements hook_facetapi_sort_info().
+ */
+function pwb_search_facetapi_sort_info() {
+  $sorts = array();
+
+  $sorts['pwb_search_sort_view_all'] = array(
+    'label' => t('Sort alphabetical, but View all always on top'),
+    'callback' => 'pwb_search_sort_view_all',
+    'description' => t('Custom sort that sort facets items alphabetical, but puts the View all link always on top.'),
+    'weight' => -50,
+  );
+
+  return $sorts;
+}
+
+/**
+ * Sort randomly.
+ */
+function pwb_search_sort_view_all(array $a, array $b) {
+  if (($a['#indexed_value'] != $b['#indexed_value']) && $a['#indexed_value'] == 0) {
+    return -1;
+  }
+  if (($a['#indexed_value'] != $b['#indexed_value']) && $b['#indexed_value'] == 0) {
+    return 1;
+  }
+  if (($a['#indexed_value'] == $b['#indexed_value']) && $a['#indexed_value'] == 0) {
+    return 0;
+  }
+}
